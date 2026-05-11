@@ -6,6 +6,8 @@ Add a GitFlow-oriented graph layout mode to Git Graph so that users can understa
 
 The default graph layout mode will be `GitFlow`.
 
+The feature must feel native to the forked Git Graph extension. Existing users should not experience the mode as a separate visual product or a diagram overlay. It is the same Git Graph view with a different lane placement strategy.
+
 ## Motivation
 
 The current graph is good for inspecting commit chronology, but it can be hard for new developers to see a repository's branching strategy. In GitFlow-style repositories, the important structure is usually the relationship between long-lived `master/main`, `develop`, short-lived release/hotfix work, and feature work. A role-based lane layout should make that structure visible without replacing the existing Git Graph experience.
@@ -25,6 +27,14 @@ In GitFlow mode, lanes are ordered left to right:
 4. `features`
 
 The graph remains vertical by commit order. Commit rows, labels, hover behavior, commit details, file actions, and context menus continue to behave as they do today.
+
+Design continuity requirements:
+
+- Do not add colored background bands, swimlanes, large headers, or diagram-style labels to the graph.
+- Do not change the existing graph stroke style, vertex style, spacing rhythm, row highlighting, typography, or commit table layout unless required for correctness.
+- Do not introduce a separate visual legend into the main graph area for the first version.
+- Any mode control should use the existing control-bar and settings-widget patterns rather than a new UI style.
+- Existing branch colors remain governed by the current graph color configuration. GitFlow roles do not get hard-coded colors in the first version.
 
 ## Classification Rules
 
@@ -70,6 +80,8 @@ The implementation should keep the current host/webview split.
 `web/main.ts` stores the selected mode as part of view state and passes it to graph rendering.
 
 `web/graph.ts` owns the layout behavior. The existing lane assignment remains available for `Default`. GitFlow mode adds a classifier and lane allocator that assign branch paths into role groups before rendering with the existing SVG drawing code.
+
+No new rendering surface should be introduced for GitFlow mode. The implementation should reuse the current SVG path and vertex rendering methods so visual differences are limited to horizontal lane placement.
 
 ## Layout Strategy
 
