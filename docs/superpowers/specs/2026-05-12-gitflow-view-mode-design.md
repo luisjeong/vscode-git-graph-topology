@@ -35,6 +35,7 @@ Design continuity requirements:
 - Do not introduce a separate visual legend into the main graph area for the first version.
 - Any mode control should use the existing control-bar and settings-widget patterns rather than a new UI style.
 - Existing branch colors remain governed by the current graph color configuration. GitFlow roles do not get hard-coded colors in the first version.
+- The graph column area may become wider when GitFlow role groups require more lanes. This width increase is acceptable, but it should use the existing graph sizing and horizontal scrolling behavior rather than a new layout treatment.
 
 ## Classification Rules
 
@@ -93,6 +94,7 @@ The GitFlow layout should:
 - Compute first-parent chains for main and develop from loaded commits.
 - Classify graph paths by role before assigning their `x` coordinate.
 - Allocate separate columns inside each role group when multiple branches overlap.
+- Allow the computed graph width to grow when role grouping needs additional lanes.
 - Keep current color selection behavior unless a future design explicitly introduces role colors.
 
 When classification cannot be completed from the loaded commit window, the algorithm should fall back locally:
