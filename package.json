@@ -757,6 +757,19 @@
 					"default": "rounded",
 					"description": "Specifies the style of the graph."
 				},
+				"git-graph.graph.layout": {
+					"type": "string",
+					"enum": [
+						"gitflow",
+						"standard"
+					],
+					"enumDescriptions": [
+						"Arrange lanes by GitFlow branch family: master/main/trunk, release/hotfix, develop/dev, then feature.",
+						"Use Git Graph's existing lane allocation behavior."
+					],
+					"default": "gitflow",
+					"description": "Specifies how branch lanes are arranged in the graph."
+				},
 				"git-graph.graph.uncommittedChanges": {
 					"type": "string",
 					"enum": [

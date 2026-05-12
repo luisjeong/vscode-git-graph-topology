@@ -56,6 +56,7 @@ declare global {
 		readonly gitTags: ReadonlyArray<string>;
 		readonly commits: GG.GitCommit[];
 		readonly commitHead: string | null;
+		readonly gitFlowLayout: GG.GitFlowLayoutData | null;
 		readonly avatars: AvatarImageCollection;
 		readonly currentBranches: string[] | null;
 		readonly moreCommitsAvailable: boolean;
