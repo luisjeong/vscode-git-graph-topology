@@ -477,22 +477,16 @@ describe('GitGraphView', () => {
 				elems: CommitElement[],
 				getCommitId: (hash: string) => number | null
 			) => boolean;
-			const windowMock = {
-				addEventListener: jest.fn()
-			};
-			const webMain = ts.sys.readFile(path.join(__dirname, '..', 'web', 'main.ts'))!;
-			const transpiledWebMain = ts.transpileModule(webMain, {
+			const expandedCommitHelper = ts.sys.readFile(path.join(__dirname, '..', 'web', 'expandedCommit.ts'))!;
+			const transpiledExpandedCommitHelper = ts.transpileModule(expandedCommitHelper, {
 				compilerOptions: {
 					module: ts.ModuleKind.None,
 					target: ts.ScriptTarget.ES2016
 				}
 			}).outputText;
-			try {
-				vm.runInNewContext(transpiledWebMain, { window: windowMock });
-			} catch (error) {
-				if ((error as { name?: string }).name !== 'ReferenceError') throw error;
-			}
-			const restoreExpandedCommitElements = (windowMock as typeof windowMock & { restoreExpandedCommitElements?: RestoreExpandedCommitElements }).restoreExpandedCommitElements!;
+			const context = {};
+			vm.runInNewContext(transpiledExpandedCommitHelper, context);
+			const restoreExpandedCommitElements = (context as { restoreExpandedCommitElements: RestoreExpandedCommitElements }).restoreExpandedCommitElements;
 
 			const expandedCommitHash = 'expanded-hash';
 			const initialExpandedCommit = {
