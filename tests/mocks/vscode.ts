@@ -214,6 +214,7 @@ function createWebviewPanel(viewType: string, title: string, _showOptions: ViewC
 		reveal: jest.fn((_viewColumn?: ViewColumn, _preserveFocus?: boolean) => { }),
 		title: title,
 		visible: true,
+		viewColumn: ViewColumn.One,
 		viewType: viewType,
 		webview: {
 			asWebviewUri: jest.fn((uri: Uri) => uri.with({ scheme: 'vscode-webview-resource', path: 'file//' + uri.path.replace(/\\/g, '/') })),
