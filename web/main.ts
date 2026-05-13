@@ -895,16 +895,12 @@ class GitGraphView {
 
 		if (this.expandedCommit !== null) {
 			const expandedCommit = this.expandedCommit, elems = getCommitElems();
-			const commitElem = findCommitElemWithId(elems, this.getCommitId(expandedCommit.commitHash));
-			const compareWithElem = expandedCommit.compareWithHash !== null ? findCommitElemWithId(elems, this.getCommitId(expandedCommit.compareWithHash)) : null;
 
-			if (commitElem === null || (expandedCommit.compareWithHash !== null && compareWithElem === null)) {
+			if (!restoreExpandedCommitElements(expandedCommit, elems, (hash) => this.getCommitId(hash))) {
 				this.closeCommitDetails(false);
 				this.saveState();
 			} else {
-				expandedCommit.index = parseInt(commitElem.dataset.id!);
-				expandedCommit.commitElem = commitElem;
-				expandedCommit.compareWithElem = compareWithElem;
+				const commitElem = expandedCommit.commitElem!, compareWithElem = expandedCommit.compareWithElem;
 				this.saveState();
 				if (expandedCommit.compareWithHash === null) {
 					// Commit Details View is open
@@ -3156,6 +3152,8 @@ class GitGraphView {
 
 /* Main */
 
+(window as Window & { restoreExpandedCommitElements?: typeof restoreExpandedCommitElements }).restoreExpandedCommitElements = restoreExpandedCommitElements;
+
 const contextMenu = new ContextMenu(), dialog = new Dialog(), eventOverlay = new EventOverlay();
 let loaded = false;
 
@@ -3912,6 +3910,18 @@ function findCommitElemWithId(elems: HTMLCollectionOf<HTMLElement>, id: number |
 		if (findIdStr === elems[i].dataset.id) return elems[i];
 	}
 	return null;
+}
+
+function restoreExpandedCommitElements(expandedCommit: ExpandedCommit, elems: HTMLCollectionOf<HTMLElement>, getCommitId: (hash: string) => number | null) {
+	const commitElem = findCommitElemWithId(elems, getCommitId(expandedCommit.commitHash));
+	const compareWithElem = expandedCommit.compareWithHash !== null ? findCommitElemWithId(elems, getCommitId(expandedCommit.compareWithHash)) : null;
+
+	if (commitElem === null || (expandedCommit.compareWithHash !== null && compareWithElem === null)) return false;
+
+	expandedCommit.index = parseInt(commitElem.dataset.id!);
+	expandedCommit.commitElem = commitElem;
+	expandedCommit.compareWithElem = compareWithElem;
+	return true;
 }
 
 function generateSignatureHtml(signature: GG.GitSignature) {

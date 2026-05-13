@@ -6,8 +6,9 @@ jest.mock('../src/extensionState');
 jest.mock('../src/logger');
 jest.mock('../src/repoManager');
 
-import * as fs from 'fs';
 import * as path from 'path';
+import * as ts from 'typescript';
+import * as vm from 'vm';
 import { ConfigurationChangeEvent } from 'vscode';
 import { AvatarEvent, AvatarManager } from '../src/avatarManager';
 import { DataSource } from '../src/dataSource';
@@ -470,10 +471,36 @@ describe('GitGraphView', () => {
 	describe('webview state restoration', () => {
 		it('Should restore expanded commits by hash when commit order changes', () => {
 			// Setup
+			type CommitElement = { dataset: { id?: string } };
+			type RestoreExpandedCommitElements = (
+				expandedCommit: { index: number; commitHash: string; commitElem: CommitElement | null; compareWithHash: string | null; compareWithElem: CommitElement | null },
+				elems: CommitElement[],
+				getCommitId: (hash: string) => number | null
+			) => boolean;
+			const windowMock = {
+				addEventListener: jest.fn()
+			};
+			const webMain = ts.sys.readFile(path.join(__dirname, '..', 'web', 'main.ts'))!;
+			const transpiledWebMain = ts.transpileModule(webMain, {
+				compilerOptions: {
+					module: ts.ModuleKind.None,
+					target: ts.ScriptTarget.ES2016
+				}
+			}).outputText;
+			try {
+				vm.runInNewContext(transpiledWebMain, { window: windowMock });
+			} catch (error) {
+				if ((error as { name?: string }).name !== 'ReferenceError') throw error;
+			}
+			const restoreExpandedCommitElements = (windowMock as typeof windowMock & { restoreExpandedCommitElements?: RestoreExpandedCommitElements }).restoreExpandedCommitElements!;
+
 			const expandedCommitHash = 'expanded-hash';
 			const initialExpandedCommit = {
 				commitHash: expandedCommitHash,
-				index: 0
+				index: 0,
+				commitElem: null,
+				compareWithHash: null,
+				compareWithElem: null
 			};
 			const reloadedCommits = [
 				{ hash: 'newer-hash' },
@@ -486,17 +513,17 @@ describe('GitGraphView', () => {
 				lookup[commit.hash] = index;
 				return lookup;
 			}, {});
-			const renderedExpandedCommit = {
-				...initialExpandedCommit,
-				index: commitLookup[initialExpandedCommit.commitHash]
-			};
-			const webMain = fs.readFileSync(path.join(__dirname, '..', 'web', 'main.ts'), 'utf8');
+			const elems = reloadedCommits.map((_, index) => ({ dataset: { id: index.toString() } }));
 
 			// Assert
-			expect(renderedExpandedCommit.commitHash).toBe(expandedCommitHash);
-			expect(renderedExpandedCommit.index).toBe(2);
-			expect(webMain).toContain('findCommitElemWithId(elems, this.getCommitId(expandedCommit.commitHash))');
-			expect(webMain).toContain('expandedCommit.index = parseInt(commitElem.dataset.id!);');
+			expect(restoreExpandedCommitElements(
+				initialExpandedCommit,
+				elems,
+				(hash) => typeof commitLookup[hash] === 'number' ? commitLookup[hash] : null
+			)).toBe(true);
+			expect(initialExpandedCommit.commitHash).toBe(expandedCommitHash);
+			expect(initialExpandedCommit.index).toBe(2);
+			expect(initialExpandedCommit.commitElem).toBe(elems[2]);
 		});
 	});
 

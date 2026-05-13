@@ -265,7 +265,7 @@ export class DataSource extends Disposable {
 			}
 
 			const gitFlowLayout = config.graph.layout === GraphLayoutMode.GitFlow
-				? computeGitFlowLayout(commitNodes, refData.head)
+				? computeGitFlowLayout(commitNodes.filter((commit) => commit.hash !== UNCOMMITTED), refData.head)
 				: null;
 
 			return {

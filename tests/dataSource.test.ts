@@ -553,6 +553,31 @@ describe('DataSource', () => {
 			);
 		});
 
+		it('Should align GitFlow layout metadata to real commits when uncommitted changes are shown', async () => {
+			// Setup
+			mockGitSuccessOnce(
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2bXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3cXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbTest NameXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbtest@mhutchie.comXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb1587559258XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbCommit Message 2\n' +
+				'2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3cXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbTest NameXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbtest@mhutchie.comXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb1587559257XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbCommit Message 1\n'
+			);
+			mockGitSuccessOnce(
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b HEAD\n' +
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b refs/heads/master\n'
+			);
+			mockGitSuccessOnce('M modified.txt\n');
+			vscode.mockExtensionSettingReturnValue('repository.showCommitsOnlyReferencedByTags', true);
+			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
+			vscode.mockExtensionSettingReturnValue('repository.showUncommittedChanges', true);
+
+			// Run
+			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, false, false, false, CommitOrdering.Date, [], [], []);
+
+			// Assert
+			expect(result.commits[0].hash).toBe(utils.UNCOMMITTED);
+			expect(result.gitFlowLayout!.commits.map((commit) => commit.hash)).toStrictEqual(
+				result.commits.filter((commit) => commit.hash !== utils.UNCOMMITTED).map((commit) => commit.hash)
+			);
+		});
+
 		it('Should return NULL GitFlow layout metadata when graph layout is standard', async () => {
 			// Setup
 			mockGitSuccessOnce(
