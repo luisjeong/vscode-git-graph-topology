@@ -4,11 +4,29 @@ import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 jest.mock('../src/askpass/askpassManager');
 jest.mock('../src/logger');
+jest.mock('path', () => ({
+	...jest.requireActual('path'),
+	normalize: jest.fn((p: string) => p)
+}));
+jest.mock('child_process', () => ({
+	...jest.requireActual('child_process'),
+	spawn: jest.fn()
+}));
+jest.mock('fs', () => ({
+	...jest.requireActual('fs'),
+	readFile: jest.fn()
+}));
+jest.mock('iconv-lite', () => {
+	const actual = jest.requireActual('iconv-lite');
+	return {
+		...actual,
+		decode: jest.fn(actual.decode)
+	};
+});
 
 import * as cp from 'child_process';
 import * as fs from 'fs';
 import * as iconv from 'iconv-lite';
-import * as path from 'path';
 import { ConfigurationChangeEvent } from 'vscode';
 import { DataSource, GitConfigKey } from '../src/dataSource';
 import { Logger } from '../src/logger';
@@ -22,14 +40,13 @@ const workspaceConfiguration = vscode.mocks.workspaceConfiguration;
 let onDidChangeConfiguration: EventEmitter<ConfigurationChangeEvent>;
 let onDidChangeGitExecutable: EventEmitter<utils.GitExecutable>;
 let logger: Logger;
-let spyOnSpawn: jest.SpyInstance, spyOnLog: jest.SpyInstance, spyOnLogError: jest.SpyInstance;
+let spyOnSpawn: jest.Mock, spyOnLog: jest.SpyInstance, spyOnLogError: jest.SpyInstance;
 
 beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
 	onDidChangeGitExecutable = new EventEmitter<utils.GitExecutable>();
 	logger = new Logger();
-	jest.spyOn(path, 'normalize').mockImplementation((p) => p);
-	spyOnSpawn = jest.spyOn(cp, 'spawn');
+	spyOnSpawn = cp.spawn as jest.Mock;
 	spyOnLog = jest.spyOn(logger, 'log');
 	spyOnLogError = jest.spyOn(logger, 'logError');
 });
@@ -3813,7 +3830,8 @@ describe('DataSource', () => {
 			// Setup
 			mockGitSuccessOnce('File contents.\n');
 			vscode.mockExtensionSettingReturnValue('fileEncoding', 'cp1252');
-			const spyOnDecode = jest.spyOn(iconv, 'decode');
+			const spyOnDecode = iconv.decode as jest.Mock;
+			spyOnDecode.mockClear();
 
 			// Run
 			const result = await dataSource.getCommitFile('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'subdirectory/file.txt');
@@ -3835,7 +3853,8 @@ describe('DataSource', () => {
 			// Setup
 			mockGitSuccessOnce('File contents.\n');
 			vscode.mockExtensionSettingReturnValue('fileEncoding', 'xyz');
-			const spyOnDecode = jest.spyOn(iconv, 'decode');
+			const spyOnDecode = iconv.decode as jest.Mock;
+			spyOnDecode.mockClear();
 
 			// Run
 			const result = await dataSource.getCommitFile('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'subdirectory/file.txt');
@@ -4283,7 +4302,8 @@ describe('DataSource', () => {
 
 		it('Should return no submodules if no .gitmodules file exists', async () => {
 			// Setup
-			const spyOnReadFile = jest.spyOn(fs, 'readFile');
+			const spyOnReadFile = fs.readFile as unknown as jest.Mock;
+			spyOnReadFile.mockClear();
 			spyOnReadFile.mockImplementationOnce((...args) => ((args as unknown) as [fs.PathLike, any, (err: NodeJS.ErrnoException | null, data: Buffer) => void])[2](new Error(), Buffer.alloc(0)));
 
 			// Run
@@ -4298,7 +4318,8 @@ describe('DataSource', () => {
 
 		it('Should return the submodules when a .gitmodules file exists', async () => {
 			// Setup
-			const spyOnReadFile = jest.spyOn(fs, 'readFile');
+			const spyOnReadFile = fs.readFile as unknown as jest.Mock;
+			spyOnReadFile.mockClear();
 			spyOnReadFile.mockImplementationOnce((...args) => ((args as unknown) as [fs.PathLike, any, (err: NodeJS.ErrnoException | null, data: string) => void])[2](null,
 				'[submodule "folder/vscode-git-graph-1"]\n' +
 				'	path = folder/vscode-git-graph-1\n' +
@@ -5983,7 +6004,7 @@ describe('DataSource', () => {
 
 		it('Should launch the interactive rebase of the current branch on a branch in a terminal', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			const spyOnOpenGitTerminal = jest.spyOn(utils, 'openGitTerminal');
 			spyOnOpenGitTerminal.mockReturnValueOnce();
 			vscode.mockExtensionSettingReturnValue('repository.sign.commits', false);
@@ -6006,7 +6027,7 @@ describe('DataSource', () => {
 
 		it('Should launch the interactive rebase of the current branch on a commit in a terminal', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			const spyOnOpenGitTerminal = jest.spyOn(utils, 'openGitTerminal');
 			spyOnOpenGitTerminal.mockReturnValueOnce();
 			vscode.mockExtensionSettingReturnValue('repository.sign.commits', false);
@@ -6029,7 +6050,7 @@ describe('DataSource', () => {
 
 		it('Should launch the interactive rebase of the current branch on a branch in a terminal (signing the new commits)', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			const spyOnOpenGitTerminal = jest.spyOn(utils, 'openGitTerminal');
 			spyOnOpenGitTerminal.mockReturnValueOnce();
 			vscode.mockExtensionSettingReturnValue('repository.sign.commits', true);
@@ -6707,7 +6728,7 @@ describe('DataSource', () => {
 	describe('openExternalDirDiff', () => {
 		it('Should launch a gui directory diff (for one commit)', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			mockGitSuccessOnce();
 
 			// Run
@@ -6730,7 +6751,7 @@ describe('DataSource', () => {
 
 		it('Should launch a gui directory diff (between two commits)', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			mockGitSuccessOnce();
 
 			// Run
@@ -6753,7 +6774,7 @@ describe('DataSource', () => {
 
 		it('Should launch a gui directory diff (for uncommitted changes)', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			mockGitSuccessOnce();
 
 			// Run
@@ -6776,7 +6797,7 @@ describe('DataSource', () => {
 
 		it('Should launch a gui directory diff (between a commit and the uncommitted changes)', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			mockGitSuccessOnce();
 
 			// Run
@@ -6799,7 +6820,7 @@ describe('DataSource', () => {
 
 		it('Should launch a directory diff in a terminal (between two commits)', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			const spyOnOpenGitTerminal = jest.spyOn(utils, 'openGitTerminal');
 			spyOnOpenGitTerminal.mockReturnValueOnce();
 
@@ -6833,7 +6854,7 @@ describe('DataSource', () => {
 
 		it('Should display the error message when the diff tool doesn\'t exit successfully', async () => {
 			// Setup
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			mockGitThrowingErrorOnce('line1\nline2\nline3');
 			vscode.window.showErrorMessage.mockResolvedValueOnce(null);
 

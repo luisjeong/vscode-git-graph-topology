@@ -2142,6 +2142,7 @@ describe('GitGraphView', () => {
 				],
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1', 'tag2'],
+				gitFlowLayout: null,
 				moreCommitsAvailable: false,
 				error: null
 			};
@@ -2178,6 +2179,7 @@ describe('GitGraphView', () => {
 							commits: getCommitsResolvedValue.commits,
 							head: getCommitsResolvedValue.head,
 							tags: getCommitsResolvedValue.tags,
+							gitFlowLayout: getCommitsResolvedValue.gitFlowLayout,
 							moreCommitsAvailable: getCommitsResolvedValue.moreCommitsAvailable,
 							onlyFollowFirstParent: false,
 							error: getCommitsResolvedValue.error
@@ -2219,6 +2221,7 @@ describe('GitGraphView', () => {
 							commits: getCommitsResolvedValue.commits,
 							head: getCommitsResolvedValue.head,
 							tags: getCommitsResolvedValue.tags,
+							gitFlowLayout: getCommitsResolvedValue.gitFlowLayout,
 							moreCommitsAvailable: getCommitsResolvedValue.moreCommitsAvailable,
 							onlyFollowFirstParent: false,
 							error: getCommitsResolvedValue.error
@@ -2260,6 +2263,7 @@ describe('GitGraphView', () => {
 							commits: getCommitsResolvedValue.commits,
 							head: getCommitsResolvedValue.head,
 							tags: getCommitsResolvedValue.tags,
+							gitFlowLayout: getCommitsResolvedValue.gitFlowLayout,
 							moreCommitsAvailable: getCommitsResolvedValue.moreCommitsAvailable,
 							onlyFollowFirstParent: false,
 							error: getCommitsResolvedValue.error
@@ -2301,6 +2305,7 @@ describe('GitGraphView', () => {
 							commits: getCommitsResolvedValue.commits,
 							head: getCommitsResolvedValue.head,
 							tags: getCommitsResolvedValue.tags,
+							gitFlowLayout: getCommitsResolvedValue.gitFlowLayout,
 							moreCommitsAvailable: getCommitsResolvedValue.moreCommitsAvailable,
 							onlyFollowFirstParent: true,
 							error: getCommitsResolvedValue.error

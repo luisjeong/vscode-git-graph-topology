@@ -345,7 +345,7 @@ describe('ExtensionState', () => {
 
 		it('Should return the default value if it is not defined', () => {
 			// Setup
-			extensionContext.workspaceState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+			extensionContext.workspaceState.get.mockImplementationOnce((_: string, defaultValue: any) => defaultValue);
 
 			// Run
 			const result = extensionState.getRepos();
@@ -460,7 +460,7 @@ describe('ExtensionState', () => {
 
 		it('Should return the default global view state if it is not defined', () => {
 			// Setup
-			extensionContext.globalState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+			extensionContext.globalState.get.mockImplementationOnce((_: string, defaultValue: any) => defaultValue);
 
 			// Run
 			const result = extensionState.getGlobalViewState();
@@ -550,7 +550,7 @@ describe('ExtensionState', () => {
 
 		it('Should return the default workspace view state if it is not defined', () => {
 			// Setup
-			extensionContext.workspaceState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+			extensionContext.workspaceState.get.mockImplementationOnce((_: string, defaultValue: any) => defaultValue);
 
 			// Run
 			const result = extensionState.getWorkspaceViewState();
@@ -617,7 +617,7 @@ describe('ExtensionState', () => {
 
 		it('Should return the default value if not defined', () => {
 			// Setup
-			extensionContext.workspaceState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+			extensionContext.workspaceState.get.mockImplementationOnce((_: string, defaultValue: any) => defaultValue);
 
 			// Run
 			const result = extensionState.getIgnoredRepos();
@@ -671,7 +671,7 @@ describe('ExtensionState', () => {
 
 		it('Should return the default value if not defined', () => {
 			// Setup
-			extensionContext.workspaceState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+			extensionContext.workspaceState.get.mockImplementationOnce((_: string, defaultValue: any) => defaultValue);
 
 			// Run
 			const result = extensionState.getLastActiveRepo();
@@ -710,7 +710,7 @@ describe('ExtensionState', () => {
 
 		it('Should return the default value if not defined', () => {
 			// Setup
-			extensionContext.globalState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+			extensionContext.globalState.get.mockImplementationOnce((_: string, defaultValue: any) => defaultValue);
 
 			// Run
 			const result = extensionState.getLastKnownGitPath();
@@ -725,7 +725,7 @@ describe('ExtensionState', () => {
 		it('Should return TRUE if the avatar storage folder existed on startup', () => {
 			// Setup
 			const spyOnStat = jest.spyOn(fs, 'stat');
-			spyOnStat.mockImplementationOnce((_, callback) => callback(null, {} as fs.Stats));
+			spyOnStat.mockImplementationOnce((_: any, callback: any) => callback(null, {} as fs.Stats));
 			const extensionState = new ExtensionState(extensionContext, onDidChangeGitExecutable.subscribe);
 
 			// Run
@@ -741,7 +741,7 @@ describe('ExtensionState', () => {
 
 		it('Should return TRUE if the avatar storage folder was successfully created', () => {
 			// Setup
-			jest.spyOn(fs, 'stat').mockImplementationOnce((_, callback) => callback(new Error(), {} as fs.Stats));
+			jest.spyOn(fs, 'stat').mockImplementationOnce((_: any, callback: any) => callback(new Error(), {} as fs.Stats));
 			const spyOnMkdir = jest.spyOn(fs, 'mkdir');
 			spyOnMkdir.mockImplementation((_, callback) => callback(null));
 			const extensionState = new ExtensionState(extensionContext, onDidChangeGitExecutable.subscribe);
@@ -760,7 +760,7 @@ describe('ExtensionState', () => {
 
 		it('Should return TRUE if the avatar storage folder was created after the initial stat check', () => {
 			// Setup
-			jest.spyOn(fs, 'stat').mockImplementationOnce((_, callback) => callback(new Error(), {} as fs.Stats));
+			jest.spyOn(fs, 'stat').mockImplementationOnce((_: any, callback: any) => callback(new Error(), {} as fs.Stats));
 			const spyOnMkdir = jest.spyOn(fs, 'mkdir');
 			spyOnMkdir.mockImplementation((_, callback) => callback({ code: 'EEXIST' } as NodeJS.ErrnoException));
 			const extensionState = new ExtensionState(extensionContext, onDidChangeGitExecutable.subscribe);
@@ -779,7 +779,7 @@ describe('ExtensionState', () => {
 
 		it('Should return FALSE if the avatar storage folder could not be created', () => {
 			// Setup
-			jest.spyOn(fs, 'stat').mockImplementationOnce((_, callback) => callback(new Error(), {} as fs.Stats));
+			jest.spyOn(fs, 'stat').mockImplementationOnce((_: any, callback: any) => callback(new Error(), {} as fs.Stats));
 			const spyOnMkdir = jest.spyOn(fs, 'mkdir');
 			spyOnMkdir.mockImplementation((_, callback) => callback({} as NodeJS.ErrnoException));
 			const extensionState = new ExtensionState(extensionContext, onDidChangeGitExecutable.subscribe);
@@ -823,7 +823,7 @@ describe('ExtensionState', () => {
 
 		it('Should return the default value if not defined', () => {
 			// Setup
-			extensionContext.globalState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+			extensionContext.globalState.get.mockImplementationOnce((_: string, defaultValue: any) => defaultValue);
 
 			// Run
 			const result = extensionState.getAvatarCache();
@@ -1432,7 +1432,7 @@ describe('ExtensionState', () => {
 
 		it('Should return the default value if not defined', () => {
 			// Setup
-			extensionContext.workspaceState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+			extensionContext.workspaceState.get.mockImplementationOnce((_: string, defaultValue: any) => defaultValue);
 
 			// Run
 			const result = extensionState.getCodeReviews();

@@ -12,6 +12,7 @@ export function waitForExpect(expect: () => void) {
 			try {
 				attempts++;
 				expect();
+				clearInterval(testInterval);
 				resolve();
 			} catch (e) {
 				if (attempts === 100) {

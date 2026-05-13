@@ -4,7 +4,11 @@ import { waitForExpect } from './helpers/expectations';
 
 describe('BufferedQueue', () => {
 	beforeEach(() => {
-		jest.useFakeTimers();
+		jest.useFakeTimers({ legacyFakeTimers: true });
+	});
+
+	afterEach(() => {
+		jest.useRealTimers();
 	});
 
 	it('Should add items to the queue, and then process them once the buffer has expired', async () => {

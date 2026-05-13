@@ -5,6 +5,11 @@ jest.mock('vscode', () => vscode, { virtual: true });
 jest.mock('../src/dataSource');
 jest.mock('../src/extensionState');
 jest.mock('../src/logger');
+jest.mock('child_process', () => ({
+	...jest.requireActual('child_process'),
+	exec: jest.fn(),
+	spawn: jest.fn()
+}));
 
 import * as fs from 'fs';
 const mockedFileSystemModule: any = {
@@ -35,14 +40,14 @@ let onDidChangeConfiguration: EventEmitter<ConfigurationChangeEvent>;
 let onDidChangeGitExecutable: EventEmitter<GitExecutable>;
 let logger: Logger;
 let dataSource: DataSource;
-let spyOnSpawn: jest.SpyInstance;
+let spyOnSpawn: jest.Mock;
 
 beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
 	onDidChangeGitExecutable = new EventEmitter<GitExecutable>();
 	logger = new Logger();
 	dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
-	spyOnSpawn = jest.spyOn(cp, 'spawn');
+	spyOnSpawn = cp.spawn as jest.Mock;
 });
 
 afterAll(() => {
@@ -1959,12 +1964,12 @@ describe('findGit', () => {
 	});
 
 	describe('process.platform === \'darwin\'', () => {
-		let spyOnExec: jest.SpyInstance;
+		let spyOnExec: jest.Mock;
 		beforeEach(() => {
 			jest.spyOn(extensionState, 'getLastKnownGitPath').mockReturnValueOnce(null);
 			vscode.mockExtensionSettingReturnValue('path', null);
 			Object.defineProperty(process, 'platform', { value: 'darwin' });
-			spyOnExec = jest.spyOn(cp, 'exec');
+			spyOnExec = cp.exec as unknown as jest.Mock;
 		});
 
 		it('Should find and return the Git executable using "which git"', async () => {
