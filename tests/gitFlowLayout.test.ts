@@ -60,18 +60,23 @@ describe('computeGitFlowLayout', () => {
 		expect(lanes([commit('g', [], { heads: ['develop-next'] })]).developHead).toBeNull();
 	});
 
-	it('prefers local branch refs over remote refs', () => {
+	it('uses the newest visible branch ref when local and remote refs diverge', () => {
 		const commits = [
+			commit('remote-main', ['local-main'], { remotes: [{ name: 'origin/main', remote: 'origin' }] }),
+			commit('remote-develop', ['local-develop', 'feature-tip'], {
+				remotes: [{ name: 'origin/develop', remote: 'origin' }],
+				message: 'Merge branch \'feature/task-refactoring\' into \'develop\''
+			}),
+			commit('feature-tip', ['local-develop']),
 			commit('local-main', [], { heads: ['main'] }),
-			commit('remote-main', [], { remotes: [{ name: 'origin/main', remote: 'origin' }] }),
-			commit('local-develop', [], { heads: ['develop'] }),
-			commit('remote-develop', [], { remotes: [{ name: 'upstream/develop', remote: 'upstream' }] })
+			commit('local-develop', [], { heads: ['develop'] })
 		];
 
 		const layout = lanes(commits);
 
-		expect(layout.mainHead).toBe('local-main');
-		expect(layout.developHead).toBe('local-develop');
+		expect(layout.mainHead).toBe('remote-main');
+		expect(layout.developHead).toBe('remote-develop');
+		expect(layout.byHash.get('remote-develop')).toBe(GitFlowLaneFamily.Develop);
 	});
 
 	it('classifies a branch merged into both main and develop as release-hotfix', () => {

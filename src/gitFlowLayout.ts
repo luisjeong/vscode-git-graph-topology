@@ -66,33 +66,10 @@ export function computeGitFlowLayout(commits: ReadonlyArray<GitCommit>, head: st
 }
 
 function selectBranchHead(commits: ReadonlyArray<GitCommit>, branchNames: ReadonlyArray<string>): string | null {
-	const localMatches = new Map<string, string>();
-	const remoteMatches = new Map<string, string>();
-
-	commits.forEach((commit) => {
-		commit.heads.forEach((head) => {
-			const branchName = normalizeLocalBranch(head);
-			if (branchNames.indexOf(branchName) >= 0 && !localMatches.has(branchName)) {
-				localMatches.set(branchName, commit.hash);
-			}
-		});
-		commit.remotes.forEach((remote) => {
-			const branchName = normalizeRemoteBranch(remote);
-			if (branchNames.indexOf(branchName) >= 0 && !remoteMatches.has(branchName)) {
-				remoteMatches.set(branchName, commit.hash);
-			}
-		});
-	});
-
-	for (let i = 0; i < branchNames.length; i++) {
-		const branchName = branchNames[i];
-		const localMatch = localMatches.get(branchName);
-		if (localMatch) return localMatch;
-	}
-	for (let i = 0; i < branchNames.length; i++) {
-		const branchName = branchNames[i];
-		const remoteMatch = remoteMatches.get(branchName);
-		if (remoteMatch) return remoteMatch;
+	for (let i = 0; i < commits.length; i++) {
+		const commit = commits[i];
+		if (commit.heads.some((head) => branchNames.indexOf(normalizeLocalBranch(head)) >= 0)) return commit.hash;
+		if (commit.remotes.some((remote) => branchNames.indexOf(normalizeRemoteBranch(remote)) >= 0)) return commit.hash;
 	}
 	return null;
 }
