@@ -1,4 +1,4 @@
-import { orderCommitsTemporallyTopological, TemporalTopologicalCommit } from '../src/commitOrdering';
+import { TemporalTopologicalCommit, orderCommitsTemporallyTopological } from '../src/commitOrdering';
 
 const commit = (hash: string, parents: ReadonlyArray<string>, date: number): TemporalTopologicalCommit => ({
 	hash,
