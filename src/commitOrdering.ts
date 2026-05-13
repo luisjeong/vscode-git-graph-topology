@@ -9,93 +9,193 @@ interface IndexedCommit<T extends TemporalTopologicalCommit> {
 	readonly index: number;
 }
 
-interface SearchState<T extends TemporalTopologicalCommit> {
-	readonly commitsByHash: ReadonlyMap<string, IndexedCommit<T>>;
-	readonly indexByHash: Map<string, number>;
-	readonly lowLinkByHash: Map<string, number>;
-	readonly stack: string[];
-	readonly stackedHashes: Set<string>;
-	readonly components: string[][];
-	nextIndex: number;
+interface SearchFrame {
+	readonly hash: string;
+	nextParentIndex: number;
 }
+
+interface ComponentState<T extends TemporalTopologicalCommit> {
+	readonly commits: ReadonlyArray<IndexedCommit<T>>;
+	nextCommitIndex: number;
+	childComponentCount: number;
+	readonly parentComponents: Set<number>;
+}
+
+class BinaryHeap<T> {
+	private readonly items: T[] = [];
+
+	public constructor(private readonly compare: (left: T, right: T) => number) {}
+
+	public get size(): number {
+		return this.items.length;
+	}
+
+	public push(item: T): void {
+		this.items.push(item);
+		this.bubbleUp(this.items.length - 1);
+	}
+
+	public pop(): T | undefined {
+		if (this.items.length === 0) {
+			return undefined;
+		}
+
+		const first = this.items[0];
+		const last = this.items.pop()!;
+		if (this.items.length > 0) {
+			this.items[0] = last;
+			this.bubbleDown(0);
+		}
+		return first;
+	}
+
+	private bubbleUp(index: number): void {
+		let currentIndex = index;
+		while (currentIndex > 0) {
+			const parentIndex = Math.floor((currentIndex - 1) / 2);
+			if (this.compare(this.items[currentIndex], this.items[parentIndex]) >= 0) {
+				return;
+			}
+
+			this.swap(currentIndex, parentIndex);
+			currentIndex = parentIndex;
+		}
+	}
+
+	private bubbleDown(index: number): void {
+		let currentIndex = index;
+		while (true) {
+			const leftIndex = currentIndex * 2 + 1;
+			const rightIndex = leftIndex + 1;
+			let bestIndex = currentIndex;
+
+			if (leftIndex < this.items.length && this.compare(this.items[leftIndex], this.items[bestIndex]) < 0) {
+				bestIndex = leftIndex;
+			}
+			if (rightIndex < this.items.length && this.compare(this.items[rightIndex], this.items[bestIndex]) < 0) {
+				bestIndex = rightIndex;
+			}
+			if (bestIndex === currentIndex) {
+				return;
+			}
+
+			this.swap(currentIndex, bestIndex);
+			currentIndex = bestIndex;
+		}
+	}
+
+	private swap(leftIndex: number, rightIndex: number): void {
+		const left = this.items[leftIndex];
+		this.items[leftIndex] = this.items[rightIndex];
+		this.items[rightIndex] = left;
+	}
+}
+
+const compareHashes = (left: string, right: string): number => {
+	if (left < right) {
+		return -1;
+	}
+	if (left > right) {
+		return 1;
+	}
+	return 0;
+};
 
 const compareIndexedCommits = <T extends TemporalTopologicalCommit>(
 	left: IndexedCommit<T>,
 	right: IndexedCommit<T>
-) => {
+): number => {
 	if (left.commit.date !== right.commit.date) {
 		return right.commit.date - left.commit.date;
 	}
 	if (left.index !== right.index) {
 		return left.index - right.index;
 	}
-	return left.commit.hash.localeCompare(right.commit.hash);
-};
-
-const strongConnect = <T extends TemporalTopologicalCommit>(hash: string, state: SearchState<T>) => {
-	state.indexByHash.set(hash, state.nextIndex);
-	state.lowLinkByHash.set(hash, state.nextIndex);
-	state.nextIndex++;
-	state.stack.push(hash);
-	state.stackedHashes.add(hash);
-
-	const indexedCommit = state.commitsByHash.get(hash);
-	if (indexedCommit) {
-		for (const parentHash of indexedCommit.commit.parents) {
-			if (!state.commitsByHash.has(parentHash)) {
-				continue;
-			}
-
-			if (!state.indexByHash.has(parentHash)) {
-				strongConnect(parentHash, state);
-				state.lowLinkByHash.set(
-					hash,
-					Math.min(state.lowLinkByHash.get(hash)!, state.lowLinkByHash.get(parentHash)!)
-				);
-			} else if (state.stackedHashes.has(parentHash)) {
-				state.lowLinkByHash.set(
-					hash,
-					Math.min(state.lowLinkByHash.get(hash)!, state.indexByHash.get(parentHash)!)
-				);
-			}
-		}
-	}
-
-	if (state.lowLinkByHash.get(hash) === state.indexByHash.get(hash)) {
-		const component: string[] = [];
-		let componentHash: string | undefined;
-		do {
-			componentHash = state.stack.pop();
-			if (componentHash) {
-				state.stackedHashes.delete(componentHash);
-				component.push(componentHash);
-			}
-		} while (componentHash && componentHash !== hash);
-		state.components.push(component);
-	}
+	return compareHashes(left.commit.hash, right.commit.hash);
 };
 
 const findComponents = <T extends TemporalTopologicalCommit>(
 	commits: ReadonlyArray<IndexedCommit<T>>,
 	commitsByHash: ReadonlyMap<string, IndexedCommit<T>>
-) => {
-	const state: SearchState<T> = {
-		commitsByHash,
-		indexByHash: new Map<string, number>(),
-		lowLinkByHash: new Map<string, number>(),
-		stack: [],
-		stackedHashes: new Set<string>(),
-		components: [],
-		nextIndex: 0
+): string[][] => {
+	const indexByHash = new Map<string, number>();
+	const lowLinkByHash = new Map<string, number>();
+	const componentStack: string[] = [];
+	const stackedHashes = new Set<string>();
+	const components: string[][] = [];
+	let nextIndex = 0;
+
+	const startVisit = (hash: string, searchStack: SearchFrame[]): void => {
+		indexByHash.set(hash, nextIndex);
+		lowLinkByHash.set(hash, nextIndex);
+		nextIndex++;
+		componentStack.push(hash);
+		stackedHashes.add(hash);
+		searchStack.push({ hash, nextParentIndex: 0 });
 	};
 
 	for (const indexedCommit of commits) {
-		if (!state.indexByHash.has(indexedCommit.commit.hash)) {
-			strongConnect(indexedCommit.commit.hash, state);
+		if (indexByHash.has(indexedCommit.commit.hash)) {
+			continue;
+		}
+
+		const searchStack: SearchFrame[] = [];
+		startVisit(indexedCommit.commit.hash, searchStack);
+
+		while (searchStack.length > 0) {
+			const frame = searchStack[searchStack.length - 1];
+			const parents = commitsByHash.get(frame.hash)!.commit.parents;
+			let descended = false;
+
+			while (frame.nextParentIndex < parents.length) {
+				const parentHash = parents[frame.nextParentIndex];
+				frame.nextParentIndex++;
+
+				if (!commitsByHash.has(parentHash)) {
+					continue;
+				}
+				if (!indexByHash.has(parentHash)) {
+					startVisit(parentHash, searchStack);
+					descended = true;
+					break;
+				}
+				if (stackedHashes.has(parentHash)) {
+					lowLinkByHash.set(
+						frame.hash,
+						Math.min(lowLinkByHash.get(frame.hash)!, indexByHash.get(parentHash)!)
+					);
+				}
+			}
+
+			if (descended) {
+				continue;
+			}
+
+			if (lowLinkByHash.get(frame.hash) === indexByHash.get(frame.hash)) {
+				const component: string[] = [];
+				let componentHash: string | undefined;
+				do {
+					componentHash = componentStack.pop();
+					if (componentHash) {
+						stackedHashes.delete(componentHash);
+						component.push(componentHash);
+					}
+				} while (componentHash && componentHash !== frame.hash);
+				components.push(component);
+			}
+
+			searchStack.pop();
+			const parentFrame = searchStack[searchStack.length - 1];
+			if (parentFrame) {
+				lowLinkByHash.set(
+					parentFrame.hash,
+					Math.min(lowLinkByHash.get(parentFrame.hash)!, lowLinkByHash.get(frame.hash)!)
+				);
+			}
 		}
 	}
 
-	return state.components;
+	return components;
 };
 
 export function orderCommitsTemporallyTopological<T extends TemporalTopologicalCommit>(commits: ReadonlyArray<T>): T[] {
@@ -110,12 +210,12 @@ export function orderCommitsTemporallyTopological<T extends TemporalTopologicalC
 		}
 	});
 
-	const childCountByComponent = new Map<number, number>();
-	const parentsByComponent = new Map<number, Set<number>>();
-	for (let componentIndex = 0; componentIndex < components.length; componentIndex++) {
-		childCountByComponent.set(componentIndex, 0);
-		parentsByComponent.set(componentIndex, new Set<number>());
-	}
+	const componentStates = components.map((component): ComponentState<T> => ({
+		commits: component.map((hash) => commitsByHash.get(hash)!).sort(compareIndexedCommits),
+		nextCommitIndex: 0,
+		childComponentCount: 0,
+		parentComponents: new Set<number>()
+	}));
 
 	for (const indexedCommit of indexedCommits) {
 		const childComponent = componentByHash.get(indexedCommit.commit.hash)!;
@@ -125,46 +225,43 @@ export function orderCommitsTemporallyTopological<T extends TemporalTopologicalC
 				continue;
 			}
 
-			const parentComponents = parentsByComponent.get(childComponent)!;
+			const parentComponents = componentStates[childComponent].parentComponents;
 			if (!parentComponents.has(parentComponent)) {
 				parentComponents.add(parentComponent);
-				childCountByComponent.set(parentComponent, childCountByComponent.get(parentComponent)! + 1);
+				componentStates[parentComponent].childComponentCount++;
 			}
 		}
 	}
 
-	const remainingByComponent = new Map<number, IndexedCommit<T>[]>();
-	for (let componentIndex = 0; componentIndex < components.length; componentIndex++) {
-		remainingByComponent.set(
-			componentIndex,
-			components[componentIndex].map((hash) => commitsByHash.get(hash)!).sort(compareIndexedCommits)
-		);
-	}
+	const currentCommit = (componentIndex: number): IndexedCommit<T> =>
+		componentStates[componentIndex].commits[componentStates[componentIndex].nextCommitIndex];
+
+	const eligibleComponents = new BinaryHeap<number>((left, right) =>
+		compareIndexedCommits(currentCommit(left), currentCommit(right))
+	);
+	componentStates.forEach((componentState, componentIndex) => {
+		if (componentState.childComponentCount === 0) {
+			eligibleComponents.push(componentIndex);
+		}
+	});
 
 	const orderedCommits: T[] = [];
-	const exhaustedComponents = new Set<number>();
-	while (orderedCommits.length < indexedCommits.length) {
-		const nextCommit = indexedCommits
-			.filter((indexedCommit) => {
-				const component = componentByHash.get(indexedCommit.commit.hash)!;
-				const remaining = remainingByComponent.get(component)!;
-				return childCountByComponent.get(component) === 0 && remaining.includes(indexedCommit);
-			})
-			.sort(compareIndexedCommits)[0];
+	while (eligibleComponents.size > 0) {
+		const componentIndex = eligibleComponents.pop()!;
+		const componentState = componentStates[componentIndex];
+		const nextCommit = componentState.commits[componentState.nextCommitIndex];
+		componentState.nextCommitIndex++;
+		orderedCommits.push(nextCommit.commit);
 
-		if (!nextCommit) {
-			break;
+		if (componentState.nextCommitIndex < componentState.commits.length) {
+			eligibleComponents.push(componentIndex);
+			continue;
 		}
 
-		orderedCommits.push(nextCommit.commit);
-		const component = componentByHash.get(nextCommit.commit.hash)!;
-		const remaining = remainingByComponent.get(component)!;
-		remaining.splice(remaining.indexOf(nextCommit), 1);
-
-		if (remaining.length === 0 && !exhaustedComponents.has(component)) {
-			exhaustedComponents.add(component);
-			for (const parentComponent of parentsByComponent.get(component)!) {
-				childCountByComponent.set(parentComponent, childCountByComponent.get(parentComponent)! - 1);
+		for (const parentComponent of componentState.parentComponents) {
+			componentStates[parentComponent].childComponentCount--;
+			if (componentStates[parentComponent].childComponentCount === 0) {
+				eligibleComponents.push(parentComponent);
 			}
 		}
 	}
