@@ -1533,7 +1533,7 @@
 		"compile-src": "tsc -p ./src && node ./.vscode/package-src.js",
 		"compile-web": "tsc -p ./web && node ./.vscode/package-web.js",
 		"compile-web-debug": "tsc -p ./web && node ./.vscode/package-web.js debug",
-		"lint": "eslint -c .eslintrc.json --max-warnings 0 --ext .ts ./src ./tests ./web",
+		"lint": "eslint --max-warnings 0 \"src/**/*.ts\" \"tests/**/*.ts\" \"web/**/*.ts\"",
 		"package": "vsce package",
 		"package-and-install": "npm run package && node ./.vscode/install-package.js",
 		"test": "jest --verbose",
@@ -1553,6 +1553,6 @@
 		"jest": "30.4.2",
 		"ts-jest": "29.4.9",
 		"typescript": "6.0.3",
-		"uglify-js": "3.10.0"
+		"uglify-js": "3.19.3"
 	}
 }
