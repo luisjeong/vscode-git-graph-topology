@@ -1,5 +1,18 @@
 const CLASS_GRAPH_VERTEX_ACTIVE = 'graphVertexActive';
 const NULL_VERTEX_ID = -1;
+const GIT_FLOW_LANE_MIN_X: { readonly [lane: string]: number } = {
+	'main': 0,
+	'release-hotfix': 2,
+	'develop': 4,
+	'feature': 6
+};
+const GIT_FLOW_LANE_SPACING = 2;
+const GIT_FLOW_LAYOUT_ORDER = [
+	GG.GitFlowLaneFamily.Main,
+	GG.GitFlowLaneFamily.Develop,
+	GG.GitFlowLaneFamily.ReleaseHotfix,
+	GG.GitFlowLaneFamily.Feature
+];
 
 
 /* Types */
@@ -12,6 +25,7 @@ interface Line {
 	readonly p1: Point;
 	readonly p2: Point;
 	readonly lockedFirst: boolean; // TRUE => The line is locked to p1, FALSE => The line is locked to p2
+	readonly compactHorizontal: boolean;
 }
 
 interface Pixel {
@@ -23,6 +37,7 @@ interface PlacedLine {
 	readonly p2: Pixel;
 	readonly isCommitted: boolean;
 	readonly lockedFirst: boolean; // TRUE => The line is locked to p1, FALSE => The line is locked to p2
+	readonly compactHorizontal: boolean;
 }
 
 interface UnavailablePoint {
@@ -45,8 +60,8 @@ class Branch {
 		this.colour = colour;
 	}
 
-	public addLine(p1: Point, p2: Point, isCommitted: boolean, lockedFirst: boolean) {
-		this.lines.push({ p1: p1, p2: p2, lockedFirst: lockedFirst });
+	public addLine(p1: Point, p2: Point, isCommitted: boolean, lockedFirst: boolean, compactHorizontal: boolean = false) {
+		this.lines.push({ p1: p1, p2: p2, lockedFirst: lockedFirst, compactHorizontal: compactHorizontal });
 		if (isCommitted) {
 			if (p2.x === 0 && p2.y < this.numUncommitted) this.numUncommitted = p2.y;
 		} else {
@@ -90,16 +105,16 @@ class Branch {
 					if (x1 === x2) { // The line is vertical, extend the endpoint past the expansion
 						y2 += config.grid.expandY;
 					} else if (line.lockedFirst) { // If the line is locked to the first point, the transition stays in its normal position
-						lines.push({ p1: { x: x1, y: y1 }, p2: { x: x2, y: y2 }, isCommitted: i >= this.numUncommitted, lockedFirst: line.lockedFirst }); // Display the normal transition
-						lines.push({ p1: { x: x2, y: y1 + config.grid.y }, p2: { x: x2, y: y2 + config.grid.expandY }, isCommitted: i >= this.numUncommitted, lockedFirst: line.lockedFirst }); // Extend the line over the expansion from the transition end point
+						lines.push({ p1: { x: x1, y: y1 }, p2: { x: x2, y: y2 }, isCommitted: i >= this.numUncommitted, lockedFirst: line.lockedFirst, compactHorizontal: line.compactHorizontal }); // Display the normal transition
+						lines.push({ p1: { x: x2, y: y1 + config.grid.y }, p2: { x: x2, y: y2 + config.grid.expandY }, isCommitted: i >= this.numUncommitted, lockedFirst: line.lockedFirst, compactHorizontal: line.compactHorizontal }); // Extend the line over the expansion from the transition end point
 						continue;
 					} else { // If the line is locked to the second point, the transition moves to after the expansion
-						lines.push({ p1: { x: x1, y: y1 }, p2: { x: x1, y: y2 - config.grid.y + config.grid.expandY }, isCommitted: i >= this.numUncommitted, lockedFirst: line.lockedFirst }); // Extend the line over the expansion to the new transition start point
+						lines.push({ p1: { x: x1, y: y1 }, p2: { x: x1, y: y2 - config.grid.y + config.grid.expandY }, isCommitted: i >= this.numUncommitted, lockedFirst: line.lockedFirst, compactHorizontal: line.compactHorizontal }); // Extend the line over the expansion to the new transition start point
 						y1 += config.grid.expandY; y2 += config.grid.expandY;
 					}
 				}
 			}
-			lines.push({ p1: { x: x1, y: y1 }, p2: { x: x2, y: y2 }, isCommitted: i >= this.numUncommitted, lockedFirst: line.lockedFirst });
+			lines.push({ p1: { x: x1, y: y1 }, p2: { x: x2, y: y2 }, isCommitted: i >= this.numUncommitted, lockedFirst: line.lockedFirst, compactHorizontal: line.compactHorizontal });
 		}
 
 		// Simplify consecutive lines that are straight by removing the 'middle' point
@@ -174,7 +189,8 @@ class Vertex {
 	private isCommitted: boolean = true;
 	private isCurrent: boolean = false;
 	private nextX: number = 0;
-	private connections: UnavailablePoint[] = [];
+	private rightmostX: number = -1;
+	private connections: Array<UnavailablePoint | undefined> = [];
 
 	constructor(id: number, isStash: boolean) {
 		this.id = id;
@@ -258,18 +274,36 @@ class Vertex {
 		return { x: this.nextX, y: this.id };
 	}
 
+	public getRightEdgePoint(): Point {
+		return { x: Math.max(this.nextX, this.rightmostX + 1), y: this.id };
+	}
+
+	public getNextPointFrom(minX: number): Point {
+		let x = Math.max(minX, this.nextX);
+		while (typeof this.connections[x] !== 'undefined') {
+			x++;
+		}
+		return { x: x, y: this.id };
+	}
+
 	public getPointConnectingTo(vertex: VertexOrNull, onBranch: Branch) {
 		for (let i = 0; i < this.connections.length; i++) {
-			if (this.connections[i].connectsTo === vertex && this.connections[i].onBranch === onBranch) {
+			const connection = this.connections[i];
+			if (typeof connection !== 'undefined' && connection.connectsTo === vertex && connection.onBranch === onBranch) {
 				return { x: i, y: this.id };
 			}
 		}
 		return null;
 	}
 	public registerUnavailablePoint(x: number, connectsToVertex: VertexOrNull, onBranch: Branch) {
-		if (x === this.nextX) {
-			this.nextX = x + 1;
+		if (typeof this.connections[x] === 'undefined') {
 			this.connections[x] = { connectsTo: connectsToVertex, onBranch: onBranch };
+		}
+		if (x > this.rightmostX) {
+			this.rightmostX = x;
+		}
+		while (typeof this.connections[this.nextX] !== 'undefined') {
+			this.nextX++;
 		}
 	}
 
@@ -346,6 +380,12 @@ class Graph {
 	private commitHead: string | null = null;
 	private commitLookup: { [hash: string]: number } = {};
 	private onlyFollowFirstParent: boolean = false;
+	private gitFlowLaneByHash: { [hash: string]: GG.GitFlowLaneFamily } | null = null;
+	private gitFlowBranchByHash: { [hash: string]: string } | null = null;
+	private gitFlowCompactByHash: { [hash: string]: boolean } | null = null;
+	private gitFlowBranchPoint: { [branch: string]: number } = {};
+	private gitFlowCompactBranchPoint: { [branch: string]: number } = {};
+	private gitFlowBranchColour: { [branch: string]: number } = {};
 	private expandedCommitIndex: number = -1;
 
 	private readonly viewElem: HTMLElement;
@@ -390,18 +430,39 @@ class Graph {
 
 	/* Graph Operations */
 
-	public loadCommits(commits: ReadonlyArray<GG.GitCommit>, commitHead: string | null, commitLookup: { [hash: string]: number }, onlyFollowFirstParent: boolean) {
+	public loadCommits(commits: ReadonlyArray<GG.GitCommit>, commitHead: string | null, commitLookup: { [hash: string]: number }, onlyFollowFirstParent: boolean, gitFlowLayout: GG.GitFlowLayoutData | null) {
 		this.commits = commits;
 		this.commitHead = commitHead;
 		this.commitLookup = commitLookup;
 		this.onlyFollowFirstParent = onlyFollowFirstParent;
+		this.gitFlowLaneByHash = null;
+		this.gitFlowBranchByHash = null;
+		this.gitFlowCompactByHash = null;
+		this.gitFlowBranchPoint = {};
+		this.gitFlowCompactBranchPoint = {};
+		this.gitFlowBranchColour = {};
 		this.vertices = [];
 		this.branches = [];
 		this.availableColours = [];
 		if (commits.length === 0) return;
 
-		const nullVertex = new Vertex(NULL_VERTEX_ID, false);
 		let i: number, j: number;
+		if (this.config.layout === GG.GraphLayoutMode.GitFlow && gitFlowLayout !== null) {
+			this.gitFlowLaneByHash = {};
+			this.gitFlowBranchByHash = {};
+			this.gitFlowCompactByHash = {};
+			for (i = 0; i < gitFlowLayout.commits.length; i++) {
+				this.gitFlowLaneByHash[gitFlowLayout.commits[i].hash] = gitFlowLayout.commits[i].lane;
+				if (typeof gitFlowLayout.commits[i].branch === 'string') {
+					this.gitFlowBranchByHash[gitFlowLayout.commits[i].hash] = gitFlowLayout.commits[i].branch!;
+				}
+				if (gitFlowLayout.commits[i].compact === true) {
+					this.gitFlowCompactByHash[gitFlowLayout.commits[i].hash] = true;
+				}
+			}
+		}
+
+		const nullVertex = new Vertex(NULL_VERTEX_ID, false);
 		for (i = 0; i < commits.length; i++) {
 			this.vertices.push(new Vertex(i, commits[i].stash !== null));
 		}
@@ -429,14 +490,7 @@ class Graph {
 			this.vertices[commitLookup[commitHead]].setCurrent();
 		}
 
-		i = 0;
-		while (i < this.vertices.length) {
-			if (this.vertices[i].getNextParent() !== null || this.vertices[i].isNotOnBranch()) {
-				this.determinePath(i);
-			} else {
-				i++;
-			}
-		}
+		this.determinePaths();
 	}
 
 	public render(expandedCommit: ExpandedCommit | null) {
@@ -467,7 +521,7 @@ class Graph {
 	public getContentWidth() {
 		let x = 0, i, p;
 		for (i = 0; i < this.vertices.length; i++) {
-			p = this.vertices[i].getNextPoint();
+			p = this.vertices[i].getRightEdgePoint();
 			if (p.x > x) x = p.x;
 		}
 		return 2 * this.config.grid.offsetX + (x - 1) * this.config.grid.x;
@@ -488,7 +542,7 @@ class Graph {
 	public getWidthsAtVertices() {
 		let widths = [], i;
 		for (i = 0; i < this.vertices.length; i++) {
-			widths[i] = this.config.grid.offsetX + this.vertices[i].getNextPoint().x * this.config.grid.x - 2;
+			widths[i] = this.config.grid.offsetX + this.vertices[i].getRightEdgePoint().x * this.config.grid.x - 2;
 		}
 		return widths;
 	}
@@ -702,10 +756,35 @@ class Graph {
 
 	/* Graph Layout Methods */
 
+	private determinePaths() {
+		if (this.gitFlowLaneByHash !== null) {
+			for (let i = 0; i < GIT_FLOW_LAYOUT_ORDER.length; i++) {
+				this.determinePathsForLane(GIT_FLOW_LAYOUT_ORDER[i]);
+			}
+		}
+
+		let i = 0;
+		while (i < this.vertices.length) {
+			if (this.vertices[i].getNextParent() !== null || this.vertices[i].isNotOnBranch()) {
+				this.determinePath(i);
+			} else {
+				i++;
+			}
+		}
+	}
+
+	private determinePathsForLane(lane: GG.GitFlowLaneFamily) {
+		for (let i = 0; i < this.vertices.length; i++) {
+			if (this.getVertexLane(this.vertices[i]) === lane && (this.vertices[i].getNextParent() !== null || this.vertices[i].isNotOnBranch())) {
+				this.determinePath(i);
+			}
+		}
+	}
+
 	private determinePath(startAt: number) {
 		let i = startAt;
 		let vertex = this.vertices[i], parentVertex = this.vertices[i].getNextParent(), curVertex;
-		let lastPoint = vertex.isNotOnBranch() ? vertex.getNextPoint() : vertex.getPoint(), curPoint;
+		let lastPoint = vertex.isNotOnBranch() ? this.getNextPoint(vertex, vertex) : vertex.getPoint(), curPoint;
 
 		if (parentVertex !== null && parentVertex.id !== NULL_VERTEX_ID && vertex.isMerge() && !vertex.isNotOnBranch() && !parentVertex.isNotOnBranch()) {
 			// Branch is a merge between two vertices already on branches
@@ -716,9 +795,11 @@ class Graph {
 				if (curPoint !== null) {
 					foundPointToParent = true; // Parent was found
 				} else {
-					curPoint = curVertex.getNextPoint(); // Parent couldn't be found, choose the next available point for the vertex
+					curPoint = this.getNextPoint(curVertex, parentVertex); // Parent couldn't be found, choose the next available point for the vertex
 				}
-				parentBranch.addLine(lastPoint, curPoint, vertex.getIsCommitted(), !foundPointToParent && curVertex !== parentVertex ? lastPoint.x < curPoint.x : true);
+				const compactHorizontal = this.shouldUseCompactGitFlowConnector(lastPoint, curPoint);
+				const lockedFirst = !foundPointToParent && curVertex !== parentVertex ? lastPoint.x < curPoint.x : true;
+				parentBranch.addLine(lastPoint, curPoint, vertex.getIsCommitted(), this.getCompactGitFlowLockedFirst(lastPoint, curPoint, lockedFirst, compactHorizontal), compactHorizontal);
 				curVertex.registerUnavailablePoint(curPoint.x, parentVertex, parentBranch);
 				lastPoint = curPoint;
 
@@ -729,13 +810,16 @@ class Graph {
 			}
 		} else {
 			// Branch is normal
-			let branch = new Branch(this.getAvailableColour(startAt));
+			const laneVertex = this.getPathLaneVertex(vertex, parentVertex);
+			const compactPathX = this.getCompactGitFlowPathX(vertex, parentVertex, laneVertex);
+			let branch = new Branch(this.getAvailableColour(startAt, laneVertex));
 			vertex.addToBranch(branch, lastPoint.x);
 			vertex.registerUnavailablePoint(lastPoint.x, vertex, branch);
 			for (i = startAt + 1; i < this.vertices.length; i++) {
 				curVertex = this.vertices[i];
-				curPoint = parentVertex === curVertex && !parentVertex.isNotOnBranch() ? curVertex.getPoint() : curVertex.getNextPoint();
-				branch.addLine(lastPoint, curPoint, vertex.getIsCommitted(), lastPoint.x < curPoint.x);
+				curPoint = parentVertex === curVertex && !parentVertex.isNotOnBranch() ? curVertex.getPoint() : this.getNextPoint(curVertex, laneVertex, compactPathX);
+				const compactHorizontal = compactPathX !== null || this.shouldUseCompactGitFlowConnector(lastPoint, curPoint);
+				branch.addLine(lastPoint, curPoint, vertex.getIsCommitted(), this.getCompactGitFlowLockedFirst(lastPoint, curPoint, lastPoint.x < curPoint.x, compactHorizontal), compactHorizontal);
 				curVertex.registerUnavailablePoint(curPoint.x, parentVertex, branch);
 				lastPoint = curPoint;
 
@@ -762,13 +846,126 @@ class Graph {
 		}
 	}
 
-	private getAvailableColour(startAt: number) {
+	private getPathLaneVertex(vertex: Vertex, parentVertex: Vertex | null) {
+		return this.gitFlowLaneByHash !== null && !vertex.isNotOnBranch() && parentVertex !== null && parentVertex.id !== NULL_VERTEX_ID && parentVertex.isNotOnBranch()
+			? parentVertex
+			: vertex;
+	}
+
+	private getCompactGitFlowPathX(vertex: Vertex, parentVertex: Vertex | null, laneVertex: Vertex) {
+		if (this.gitFlowLaneByHash === null || vertex.isNotOnBranch() || parentVertex === null || parentVertex.id === NULL_VERTEX_ID || !parentVertex.isNotOnBranch()) {
+			return null;
+		}
+		const lane = this.getVertexLane(laneVertex);
+		if ((lane !== GG.GitFlowLaneFamily.Feature && lane !== GG.GitFlowLaneFamily.ReleaseHotfix) || !this.isCompactGitFlowVertex(laneVertex)) {
+			return null;
+		}
+		const branch = this.getVertexGitFlowBranch(laneVertex);
+		return typeof branch === 'string' && typeof this.gitFlowCompactBranchPoint[branch] === 'number'
+			? this.gitFlowCompactBranchPoint[branch]
+			: vertex.getPoint().x + 1;
+	}
+
+	private getNextPoint(vertex: Vertex, laneVertex: Vertex, preferredX: number | null = null): Point {
+		if (this.gitFlowLaneByHash === null) {
+			return vertex.getNextPoint();
+		}
+
+		const laneVertexHash = this.getVertexHash(laneVertex);
+		if (laneVertexHash === null) {
+			return vertex.getNextPoint();
+		}
+
+		const lane = this.getVertexLane(laneVertex);
+		const laneMinX = typeof lane === 'string' ? this.getGitFlowLaneMinX(lane, laneVertex) : undefined;
+		if (typeof laneMinX !== 'number') {
+			return vertex.getNextPoint();
+		}
+
+		const branch = this.getVertexGitFlowBranch(laneVertex);
+		const compact = this.isCompactGitFlowVertex(laneVertex);
+		if (preferredX !== null) {
+			const point = vertex.getNextPointFrom(typeof branch === 'string' && typeof this.gitFlowCompactBranchPoint[branch] === 'number' ? this.gitFlowCompactBranchPoint[branch] : preferredX);
+			if (typeof branch === 'string') {
+				this.gitFlowCompactBranchPoint[branch] = point.x;
+			}
+			return point;
+		}
+
+		if (compact && typeof branch === 'string' && typeof this.gitFlowCompactBranchPoint[branch] === 'number') {
+			return vertex.getNextPointFrom(this.gitFlowCompactBranchPoint[branch]);
+		}
+		if (typeof branch === 'string' && typeof this.gitFlowBranchPoint[branch] === 'number') {
+			return vertex.getNextPointFrom(this.gitFlowBranchPoint[branch]);
+		}
+
+		const point = vertex.getNextPointFrom(laneMinX);
+		if (compact && typeof branch === 'string') {
+			this.gitFlowCompactBranchPoint[branch] = point.x;
+		} else if (typeof branch === 'string') {
+			this.gitFlowBranchPoint[branch] = point.x;
+		}
+		return point;
+	}
+
+	private shouldUseCompactGitFlowConnector(p1: Point, p2: Point) {
+		return this.gitFlowLaneByHash !== null && Math.abs(p1.x - p2.x) >= GIT_FLOW_LANE_SPACING;
+	}
+
+	private getCompactGitFlowLockedFirst(p1: Point, p2: Point, defaultLockedFirst: boolean, compactHorizontal: boolean) {
+		if (!compactHorizontal) {
+			return defaultLockedFirst;
+		}
+		const developX = GIT_FLOW_LANE_MIN_X[GG.GitFlowLaneFamily.Develop];
+		const mainX = GIT_FLOW_LANE_MIN_X[GG.GitFlowLaneFamily.Main];
+		const p1Distance = Math.abs(p1.x - developX);
+		const p2Distance = Math.abs(p2.x - developX);
+		if (p1.x === mainX || p2.x === mainX) {
+			return p1Distance === p2Distance ? defaultLockedFirst : p1Distance < p2Distance;
+		}
+		return p1Distance === p2Distance ? defaultLockedFirst : p1Distance > p2Distance;
+	}
+
+	private getVertexLane(vertex: Vertex): GG.GitFlowLaneFamily | undefined {
+		const hash = this.getVertexHash(vertex);
+		return hash !== null && this.gitFlowLaneByHash !== null ? this.gitFlowLaneByHash[hash] : undefined;
+	}
+
+	private getVertexGitFlowBranch(vertex: Vertex): string | undefined {
+		const hash = this.getVertexHash(vertex);
+		return hash !== null && this.gitFlowBranchByHash !== null ? this.gitFlowBranchByHash[hash] : undefined;
+	}
+
+	private isCompactGitFlowVertex(vertex: Vertex) {
+		const hash = this.getVertexHash(vertex);
+		return hash !== null && this.gitFlowCompactByHash !== null && this.gitFlowCompactByHash[hash];
+	}
+
+	private getGitFlowLaneMinX(lane: GG.GitFlowLaneFamily, vertex: Vertex) {
+		if ((lane === GG.GitFlowLaneFamily.Feature || lane === GG.GitFlowLaneFamily.ReleaseHotfix) && this.isCompactGitFlowVertex(vertex)) {
+			return GIT_FLOW_LANE_MIN_X[GG.GitFlowLaneFamily.Develop] + 1;
+		}
+		return GIT_FLOW_LANE_MIN_X[lane];
+	}
+
+	private getVertexHash(vertex: Vertex): string | null {
+		return vertex.id > -1 && vertex.id < this.commits.length ? this.commits[vertex.id].hash : null;
+	}
+
+	private getAvailableColour(startAt: number, vertex?: Vertex) {
+		const branch = typeof vertex !== 'undefined' ? this.getVertexGitFlowBranch(vertex) : undefined;
+		if (typeof branch === 'string' && typeof this.gitFlowBranchColour[branch] === 'number') {
+			return this.gitFlowBranchColour[branch];
+		}
+
 		for (let i = 0; i < this.availableColours.length; i++) {
 			if (startAt > this.availableColours[i]) {
+				if (typeof branch === 'string') this.gitFlowBranchColour[branch] = i;
 				return i;
 			}
 		}
 		this.availableColours.push(0);
+		if (typeof branch === 'string') this.gitFlowBranchColour[branch] = this.availableColours.length - 1;
 		return this.availableColours.length - 1;
 	}
 

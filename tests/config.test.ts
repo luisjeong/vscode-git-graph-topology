@@ -2,7 +2,7 @@ import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 
 import { getConfig } from '../src/config';
-import { CommitDetailsViewLocation, CommitOrdering, DateFormatType, DateType, FileViewType, GitResetMode, GraphStyle, GraphUncommittedChangesStyle, RepoDropdownOrder, SquashMessageFormat, TabIconColourTheme, TagType } from '../src/types';
+import { CommitDetailsViewLocation, CommitOrdering, DateFormatType, DateType, FileViewType, GitResetMode, GraphLayoutMode, GraphStyle, GraphUncommittedChangesStyle, RepoDropdownOrder, SquashMessageFormat, TabIconColourTheme, TagType } from '../src/types';
 
 import { expectRenamedExtensionSettingToHaveBeenCalled } from './helpers/expectations';
 
@@ -1779,6 +1779,41 @@ describe('Config', () => {
 				// Assert
 				expectRenamedExtensionSettingToHaveBeenCalled('graph.style', 'graphStyle');
 				expect(value).toBe(GraphStyle.Rounded);
+			});
+		});
+
+		describe('layout', () => {
+			it('Should return GraphLayoutMode.GitFlow when the configuration value is unknown', () => {
+				// Run
+				const value = config.graph.layout;
+
+				// Assert
+				expect(workspaceConfiguration.get).toBeCalledWith('graph.layout', 'gitflow');
+				expect(value).toBe(GraphLayoutMode.GitFlow);
+			});
+
+			it('Should return GraphLayoutMode.Standard when the configuration value is "standard"', () => {
+				// Setup
+				vscode.mockExtensionSettingReturnValue('graph.layout', 'standard');
+
+				// Run
+				const value = config.graph.layout;
+
+				// Assert
+				expect(workspaceConfiguration.get).toBeCalledWith('graph.layout', 'gitflow');
+				expect(value).toBe(GraphLayoutMode.Standard);
+			});
+
+			it('Should return GraphLayoutMode.GitFlow when the configuration value is invalid', () => {
+				// Setup
+				vscode.mockExtensionSettingReturnValue('graph.layout', 'invalid');
+
+				// Run
+				const value = config.graph.layout;
+
+				// Assert
+				expect(workspaceConfiguration.get).toBeCalledWith('graph.layout', 'gitflow');
+				expect(value).toBe(GraphLayoutMode.GitFlow);
 			});
 		});
 

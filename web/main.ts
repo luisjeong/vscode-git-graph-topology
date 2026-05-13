@@ -8,6 +8,7 @@ class GitGraphView {
 	private gitTags: ReadonlyArray<string> = [];
 	private commits: GG.GitCommit[] = [];
 	private commitHead: string | null = null;
+	private gitFlowLayout: GG.GitFlowLayoutData | null = null;
 	private commitLookup: { [hash: string]: number } = {};
 	private onlyFollowFirstParent: boolean = false;
 	private avatars: AvatarImageCollection = {};
@@ -125,8 +126,9 @@ class GitGraphView {
 			this.expandedCommit = prevState.expandedCommit;
 			this.avatars = prevState.avatars;
 			this.gitConfig = prevState.gitConfig;
+			this.gitFlowLayout = typeof prevState.gitFlowLayout !== 'undefined' ? prevState.gitFlowLayout : null;
 			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
-			this.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
+			this.loadCommits(prevState.commits, prevState.commitHead, this.gitFlowLayout, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
 			this.findWidget.restoreState(prevState.findWidget);
 			this.settingsWidget.restoreState(prevState.settingsWidget);
 			this.showRemoteBranchesElem.checked = getShowRemoteBranches(this.gitRepos[prevState.currentRepo].showRemoteBranchesV2);
@@ -300,12 +302,16 @@ class GitGraphView {
 		}
 	}
 
-	private loadCommits(commits: GG.GitCommit[], commitHead: string | null, tags: ReadonlyArray<string>, moreAvailable: boolean, onlyFollowFirstParent: boolean) {
+	private loadCommits(commits: GG.GitCommit[], commitHead: string | null, gitFlowLayout: GG.GitFlowLayoutData | null, tags: ReadonlyArray<string>, moreAvailable: boolean, onlyFollowFirstParent: boolean) {
 		// This list of tags is just used to provide additional information in the dialogs. Tag information included in commits is used for all other purposes (e.g. rendering, context menus)
 		const tagsChanged = !arraysStrictlyEqual(this.gitTags, tags);
+		const gitFlowLayoutChanged = !(
+			(this.gitFlowLayout === null && gitFlowLayout === null) ||
+			(this.gitFlowLayout !== null && gitFlowLayout !== null && this.gitFlowLayout.mainHead === gitFlowLayout.mainHead && this.gitFlowLayout.developHead === gitFlowLayout.developHead && arraysEqual(this.gitFlowLayout.commits, gitFlowLayout.commits, (a, b) => a.hash === b.hash && a.lane === b.lane))
+		);
 		this.gitTags = tags;
 
-		if (!this.currentRepoLoading && !this.currentRepoRefreshState.hard && this.moreCommitsAvailable === moreAvailable && this.onlyFollowFirstParent === onlyFollowFirstParent && this.commitHead === commitHead && commits.length > 0 && arraysEqual(this.commits, commits, (a, b) =>
+		if (!this.currentRepoLoading && !this.currentRepoRefreshState.hard && !gitFlowLayoutChanged && this.moreCommitsAvailable === moreAvailable && this.onlyFollowFirstParent === onlyFollowFirstParent && this.commitHead === commitHead && commits.length > 0 && arraysEqual(this.commits, commits, (a, b) =>
 			a.hash === b.hash &&
 			arraysStrictlyEqual(a.heads, b.heads) &&
 			arraysEqual(a.tags, b.tags, (a, b) => a.name === b.name && a.annotated === b.annotated) &&
@@ -344,6 +350,7 @@ class GitGraphView {
 		this.onlyFollowFirstParent = onlyFollowFirstParent;
 		this.commits = commits;
 		this.commitHead = commitHead;
+		this.gitFlowLayout = gitFlowLayout;
 		this.commitLookup = {};
 
 		let i: number, expandedCommitVisible = false, expandedCompareWithCommitVisible = false, avatarsNeeded: { [email: string]: string[] } = {}, commit;
@@ -372,7 +379,7 @@ class GitGraphView {
 
 		this.saveState();
 
-		this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, this.onlyFollowFirstParent);
+		this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, this.onlyFollowFirstParent, this.gitFlowLayout);
 		this.render();
 
 		if (currentRepoLoading && this.config.onRepoLoad.scrollToHead && this.commitHead !== null) {
@@ -449,11 +456,12 @@ class GitGraphView {
 		this.moreCommitsAvailable = false;
 		this.commits = [];
 		this.commitHead = null;
+		this.gitFlowLayout = null;
 		this.commitLookup = {};
 		this.renderedGitBranchHead = null;
 		this.closeCommitDetails(false);
 		this.saveState();
-		this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, this.onlyFollowFirstParent);
+		this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, this.onlyFollowFirstParent, this.gitFlowLayout);
 		this.tableElem.innerHTML = '';
 		this.footerElem.innerHTML = '';
 		this.renderGraph();
@@ -475,7 +483,7 @@ class GitGraphView {
 		if (msg.error === null) {
 			const refreshState = this.currentRepoRefreshState;
 			if (refreshState.inProgress && refreshState.loadCommitsRefreshId === msg.refreshId) {
-				this.loadCommits(msg.commits, msg.head, msg.tags, msg.moreCommitsAvailable, msg.onlyFollowFirstParent);
+				this.loadCommits(msg.commits, msg.head, msg.gitFlowLayout, msg.tags, msg.moreCommitsAvailable, msg.onlyFollowFirstParent);
 			}
 		} else {
 			const error = this.gitBranches.length === 0 && msg.error.indexOf('bad revision \'HEAD\'') > -1
@@ -720,6 +728,7 @@ class GitGraphView {
 			gitTags: this.gitTags,
 			commits: this.commits,
 			commitHead: this.commitHead,
+			gitFlowLayout: this.gitFlowLayout,
 			avatars: this.avatars,
 			currentBranches: this.currentBranches,
 			moreCommitsAvailable: this.moreCommitsAvailable,

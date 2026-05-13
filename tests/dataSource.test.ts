@@ -12,7 +12,7 @@ import * as path from 'path';
 import { ConfigurationChangeEvent } from 'vscode';
 import { DataSource, GitConfigKey } from '../src/dataSource';
 import { Logger } from '../src/logger';
-import { CommitOrdering, GitConfigLocation, GitPushBranchMode, GitResetMode, GitSignature, GitSignatureStatus, MergeActionOn, RebaseActionOn, TagType } from '../src/types';
+import { CommitOrdering, GitConfigLocation, GitFlowLaneFamily, GitPushBranchMode, GitResetMode, GitSignature, GitSignatureStatus, MergeActionOn, RebaseActionOn, TagType } from '../src/types';
 import * as utils from '../src/utils';
 import { EventEmitter } from '../src/utils/event';
 
@@ -499,6 +499,61 @@ describe('DataSource', () => {
 	});
 
 	describe('getCommits', () => {
+		const getCommitsWithStandardLayout: DataSource['getCommits'] = (...args) => {
+			vscode.mockExtensionSettingReturnValue('graph.layout', 'standard');
+			return dataSource.getCommits(...args);
+		};
+
+		it('Should return GitFlow layout metadata by default', async () => {
+			// Setup
+			mockGitSuccessOnce(
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2bXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbTest NameXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbtest@mhutchie.comXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb1587559258XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbCommit Message\n'
+			);
+			mockGitSuccessOnce(
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b HEAD\n' +
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b refs/heads/master\n'
+			);
+			vscode.mockExtensionSettingReturnValue('repository.showCommitsOnlyReferencedByTags', true);
+			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
+			vscode.mockExtensionSettingReturnValue('repository.showUncommittedChanges', false);
+
+			// Run
+			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, false, false, false, CommitOrdering.Date, [], [], []);
+
+			// Assert
+			expect((result as any).gitFlowLayout).toStrictEqual({
+				commits: [
+					{
+						hash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
+						lane: GitFlowLaneFamily.Main
+					}
+				],
+				mainHead: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
+				developHead: null
+			});
+		});
+
+		it('Should return NULL GitFlow layout metadata when graph layout is standard', async () => {
+			// Setup
+			mockGitSuccessOnce(
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2bXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbTest NameXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbtest@mhutchie.comXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb1587559258XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbCommit Message\n'
+			);
+			mockGitSuccessOnce(
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b HEAD\n' +
+				'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b refs/heads/master\n'
+			);
+			vscode.mockExtensionSettingReturnValue('graph.layout', 'standard');
+			vscode.mockExtensionSettingReturnValue('repository.showCommitsOnlyReferencedByTags', true);
+			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
+			vscode.mockExtensionSettingReturnValue('repository.showUncommittedChanges', false);
+
+			// Run
+			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, false, false, false, CommitOrdering.Date, [], [], []);
+
+			// Assert
+			expect((result as any).gitFlowLayout).toBeNull();
+		});
+
 		it('Should return the commits (show all branches)', async () => {
 			// Setup
 			mockGitSuccessOnce(
@@ -530,7 +585,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -588,6 +643,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1', 'tag2'],
 				moreCommitsAvailable: false,
@@ -626,7 +682,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', ['master', 'develop'], 300, true, true, false, false, CommitOrdering.AuthorDate, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', ['master', 'develop'], 300, true, true, false, false, CommitOrdering.AuthorDate, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -680,6 +736,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -712,7 +769,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 2, true, true, false, false, CommitOrdering.Topological, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 2, true, true, false, false, CommitOrdering.Topological, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -754,6 +811,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: [],
 				moreCommitsAvailable: true,
@@ -786,7 +844,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -828,6 +886,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -860,7 +919,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -902,6 +961,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -938,7 +998,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -992,6 +1052,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1029,7 +1090,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, false, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, false, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -1083,6 +1144,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1120,7 +1182,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -1174,6 +1236,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1210,7 +1273,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, false, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, false, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -1264,6 +1327,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1302,7 +1366,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, true, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, true, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -1356,6 +1420,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1394,7 +1459,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, true, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, true, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -1448,6 +1513,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1489,7 +1555,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -1546,6 +1612,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1585,7 +1652,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin', 'other-remote'], ['other-remote'], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin', 'other-remote'], ['other-remote'], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -1639,6 +1706,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1676,7 +1744,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [
 				{
 					hash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 					baseHash: '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c',
@@ -1745,6 +1813,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -1780,7 +1849,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [
 				{
 					hash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
 					baseHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
@@ -1887,6 +1956,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: [],
 				moreCommitsAvailable: false,
@@ -1922,7 +1992,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [
 				{
 					hash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
 					baseHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
@@ -2029,6 +2099,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: [],
 				moreCommitsAvailable: false,
@@ -2064,7 +2135,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [
 				{
 					hash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
 					baseHash: '6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a',
@@ -2129,6 +2200,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: [],
 				moreCommitsAvailable: false,
@@ -2163,7 +2235,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -2205,6 +2277,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -2223,11 +2296,12 @@ describe('DataSource', () => {
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
 				commits: [],
+				gitFlowLayout: null,
 				head: null,
 				tags: [],
 				moreCommitsAvailable: false,
@@ -2267,7 +2341,7 @@ describe('DataSource', () => {
 			date.setCurrentTime(1587559259);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
@@ -2321,6 +2395,7 @@ describe('DataSource', () => {
 						stash: null
 					}
 				],
+				gitFlowLayout: null,
 				head: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				tags: ['tag1'],
 				moreCommitsAvailable: false,
@@ -2347,11 +2422,12 @@ describe('DataSource', () => {
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
 				commits: [],
+				gitFlowLayout: null,
 				head: null,
 				tags: [],
 				moreCommitsAvailable: false,
@@ -2371,11 +2447,12 @@ describe('DataSource', () => {
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
 
 			// Run
-			const result = await dataSource.getCommits('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			const result = await getCommitsWithStandardLayout('/path/to/repo', null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
 
 			// Assert
 			expect(result).toStrictEqual({
 				commits: [],
+				gitFlowLayout: null,
 				head: null,
 				tags: [],
 				moreCommitsAvailable: false,

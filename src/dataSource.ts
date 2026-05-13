@@ -5,8 +5,9 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
+import { computeGitFlowLayout } from './gitFlowLayout';
 import { Logger } from './logger';
-import { CommitOrdering, DateType, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { CommitOrdering, DateType, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitFlowLayoutData, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, GraphLayoutMode, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -260,15 +261,20 @@ export class DataSource extends Disposable {
 				}
 			}
 
+			const gitFlowLayout = config.graph.layout === GraphLayoutMode.GitFlow
+				? computeGitFlowLayout(commitNodes, refData.head)
+				: null;
+
 			return {
 				commits: commitNodes,
+				gitFlowLayout: gitFlowLayout,
 				head: refData.head,
 				tags: unique(refData.tags.map((tag) => tag.name)),
 				moreCommitsAvailable: moreCommitsAvailable,
 				error: null
 			};
 		}).catch((errorMessage) => {
-			return { commits: [], head: null, tags: [], moreCommitsAvailable: false, error: errorMessage };
+			return { commits: [], gitFlowLayout: null, head: null, tags: [], moreCommitsAvailable: false, error: errorMessage };
 		});
 	}
 
@@ -1965,6 +1971,7 @@ interface GitCommitRecord {
 
 interface GitCommitData {
 	commits: GitCommit[];
+	gitFlowLayout: GitFlowLayoutData | null;
 	head: string | null;
 	tags: string[];
 	moreCommitsAvailable: boolean;

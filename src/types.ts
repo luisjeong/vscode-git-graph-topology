@@ -13,6 +13,31 @@ export interface GitCommit {
 	readonly stash: GitCommitStash | null; // null => not a stash, otherwise => stash info
 }
 
+export const enum GitFlowLaneFamily {
+	Main = 'main',
+	ReleaseHotfix = 'release-hotfix',
+	Develop = 'develop',
+	Feature = 'feature'
+}
+
+export interface GitFlowCommitLayout {
+	readonly hash: string;
+	readonly lane: GitFlowLaneFamily;
+	readonly branch?: string;
+	readonly compact?: boolean;
+}
+
+export interface GitFlowLayoutData {
+	readonly commits: ReadonlyArray<GitFlowCommitLayout>;
+	readonly mainHead: string | null;
+	readonly developHead: string | null;
+}
+
+export const enum GraphLayoutMode {
+	GitFlow = 'gitflow',
+	Standard = 'standard'
+}
+
 export interface GitCommitTag {
 	readonly name: string;
 	readonly annotated: boolean;
@@ -283,6 +308,7 @@ export interface CommitDetailsViewConfig {
 
 export interface GraphConfig {
 	readonly colours: ReadonlyArray<string>;
+	readonly layout: GraphLayoutMode;
 	readonly style: GraphStyle;
 	readonly grid: { x: number, y: number, offsetX: number, offsetY: number, expandY: number };
 	readonly uncommittedChanges: GraphUncommittedChangesStyle;
@@ -916,6 +942,7 @@ export interface ResponseLoadCommits extends ResponseWithErrorInfo {
 	readonly command: 'loadCommits';
 	readonly refreshId: number;
 	readonly commits: GitCommit[];
+	readonly gitFlowLayout: GitFlowLayoutData | null;
 	readonly head: string | null;
 	readonly tags: string[];
 	readonly moreCommitsAvailable: boolean;
