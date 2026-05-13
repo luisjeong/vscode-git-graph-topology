@@ -6,6 +6,7 @@ jest.mock('../src/extensionState');
 jest.mock('../src/logger');
 jest.mock('../src/repoManager');
 
+import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigurationChangeEvent } from 'vscode';
 import { AvatarEvent, AvatarManager } from '../src/avatarManager';
@@ -463,6 +464,39 @@ describe('GitGraphView', () => {
 				// Assert
 				expect(mockedWebviewPanel.mocks.messages).toHaveLength(0);
 			});
+		});
+	});
+
+	describe('webview state restoration', () => {
+		it('Should restore expanded commits by hash when commit order changes', () => {
+			// Setup
+			const expandedCommitHash = 'expanded-hash';
+			const initialExpandedCommit = {
+				commitHash: expandedCommitHash,
+				index: 0
+			};
+			const reloadedCommits = [
+				{ hash: 'newer-hash' },
+				{ hash: 'older-hash' },
+				{ hash: expandedCommitHash }
+			];
+
+			// Run
+			const commitLookup = reloadedCommits.reduce<{ [hash: string]: number }>((lookup, commit, index) => {
+				lookup[commit.hash] = index;
+				return lookup;
+			}, {});
+			const renderedExpandedCommit = {
+				...initialExpandedCommit,
+				index: commitLookup[initialExpandedCommit.commitHash]
+			};
+			const webMain = fs.readFileSync(path.join(__dirname, '..', 'web', 'main.ts'), 'utf8');
+
+			// Assert
+			expect(renderedExpandedCommit.commitHash).toBe(expandedCommitHash);
+			expect(renderedExpandedCommit.index).toBe(2);
+			expect(webMain).toContain('findCommitElemWithId(elems, this.getCommitId(expandedCommit.commitHash))');
+			expect(webMain).toContain('expandedCommit.index = parseInt(commitElem.dataset.id!);');
 		});
 	});
 

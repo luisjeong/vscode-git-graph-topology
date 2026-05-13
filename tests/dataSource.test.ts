@@ -548,6 +548,9 @@ describe('DataSource', () => {
 				mainHead: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 				developHead: null
 			});
+			expect(result.gitFlowLayout!.commits.map((commit) => commit.hash)).toStrictEqual(
+				result.commits.filter((commit) => commit.hash !== utils.UNCOMMITTED).map((commit) => commit.hash)
+			);
 		});
 
 		it('Should return NULL GitFlow layout metadata when graph layout is standard', async () => {
