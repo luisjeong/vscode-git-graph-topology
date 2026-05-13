@@ -135,7 +135,7 @@ describe('AvatarManager', () => {
 				}, expect.anything());
 				expect(spyOnHttpsGet).toHaveBeenCalledWith({
 					hostname: 'avatar-url',
-					path: '/&size=162',
+					path: '/?size=162',
 					headers: { 'User-Agent': 'vscode-git-graph' },
 					agent: false,
 					timeout: 15000
@@ -185,7 +185,7 @@ describe('AvatarManager', () => {
 				}, expect.anything());
 				expect(spyOnHttpsGet).toHaveBeenCalledWith({
 					hostname: 'avatar-url',
-					path: '/&size=162',
+					path: '/?size=162',
 					headers: { 'User-Agent': 'vscode-git-graph' },
 					agent: false,
 					timeout: 15000
@@ -304,7 +304,7 @@ describe('AvatarManager', () => {
 				}, expect.anything());
 				expect(spyOnHttpsGet).toHaveBeenCalledWith({
 					hostname: 'avatar-url',
-					path: '/&size=162',
+					path: '/?size=162',
 					headers: { 'User-Agent': 'vscode-git-graph' },
 					agent: false,
 					timeout: 15000
@@ -1347,7 +1347,7 @@ describe('AvatarManager', () => {
 		it('Should fetch multiple avatars', async () => {
 			// Setup
 			spyOnGetRemoteUrl.mockResolvedValueOnce(null);
-			jest.useFakeTimers();
+			jest.useFakeTimers({ legacyFakeTimers: true });
 			mockHttpsResponse(200, 'binary-image-data-one');
 			mockWriteFile(null);
 			mockReadFile('binary-image-data-one');

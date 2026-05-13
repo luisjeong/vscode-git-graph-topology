@@ -37,7 +37,7 @@ export const mocks = {
 			get: jest.fn(),
 			update: jest.fn()
 		}
-	},
+	} as any,
 	outputChannel: {
 		appendLine: jest.fn(),
 		dispose: jest.fn()
