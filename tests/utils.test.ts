@@ -5,6 +5,11 @@ jest.mock('vscode', () => vscode, { virtual: true });
 jest.mock('../src/dataSource');
 jest.mock('../src/extensionState');
 jest.mock('../src/logger');
+jest.mock('child_process', () => ({
+	...jest.requireActual('child_process'),
+	exec: jest.fn(),
+	spawn: jest.fn()
+}));
 
 import * as fs from 'fs';
 const mockedFileSystemModule: any = {
@@ -35,14 +40,14 @@ let onDidChangeConfiguration: EventEmitter<ConfigurationChangeEvent>;
 let onDidChangeGitExecutable: EventEmitter<GitExecutable>;
 let logger: Logger;
 let dataSource: DataSource;
-let spyOnSpawn: jest.SpyInstance;
+let spyOnSpawn: jest.Mock;
 
 beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
 	onDidChangeGitExecutable = new EventEmitter<GitExecutable>();
 	logger = new Logger();
 	dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
-	spyOnSpawn = jest.spyOn(cp, 'spawn');
+	spyOnSpawn = cp.spawn as jest.Mock;
 });
 
 afterAll(() => {
@@ -134,7 +139,7 @@ describe('realpath', () => {
 
 		// Assert
 		expect(path).toBe('/a/b');
-		expect(mockedFileSystemModule.realpath).toBeCalledWith('\\a\\b', expect.anything());
+		expect(mockedFileSystemModule.realpath).toHaveBeenCalledWith('\\a\\b', expect.anything());
 		expect(mockedFileSystemModule.realpath.native).toHaveBeenCalledTimes(0);
 	});
 
@@ -148,7 +153,7 @@ describe('realpath', () => {
 		// Assert
 		expect(path).toBe('/a/b');
 		expect(mockedFileSystemModule.realpath).toHaveBeenCalledTimes(0);
-		expect(mockedFileSystemModule.realpath.native).toBeCalledWith('\\a\\b', expect.anything());
+		expect(mockedFileSystemModule.realpath.native).toHaveBeenCalledWith('\\a\\b', expect.anything());
 	});
 
 	it('Should return the original path if fs.realpath returns an error', async () => {
@@ -160,7 +165,7 @@ describe('realpath', () => {
 
 		// Assert
 		expect(path).toBe('/a/b');
-		expect(mockedFileSystemModule.realpath).toBeCalledWith('/a/b', expect.anything());
+		expect(mockedFileSystemModule.realpath).toHaveBeenCalledWith('/a/b', expect.anything());
 		expect(mockedFileSystemModule.realpath.native).toHaveBeenCalledTimes(0);
 	});
 });
@@ -646,7 +651,7 @@ describe('archive', () => {
 
 		// Assert
 		expect(result).toBe(null);
-		expect(spyOnArchive).toBeCalledWith('/repo/path', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '/archive/file/destination.tar', 'tar');
+		expect(spyOnArchive).toHaveBeenCalledWith('/repo/path', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '/archive/file/destination.tar', 'tar');
 	});
 
 	it('Should trigger the creation of the archive (TAR)', async () => {
@@ -660,7 +665,7 @@ describe('archive', () => {
 
 		// Assert
 		expect(result).toBe(null);
-		expect(spyOnArchive).toBeCalledWith('/repo/path', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '/archive/file/destination.TAR', 'tar');
+		expect(spyOnArchive).toHaveBeenCalledWith('/repo/path', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '/archive/file/destination.TAR', 'tar');
 	});
 
 	it('Should trigger the creation of the archive (zip)', async () => {
@@ -674,7 +679,7 @@ describe('archive', () => {
 
 		// Assert
 		expect(result).toBe(null);
-		expect(spyOnArchive).toBeCalledWith('/repo/path', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '/archive/file/destination.zip', 'zip');
+		expect(spyOnArchive).toHaveBeenCalledWith('/repo/path', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '/archive/file/destination.zip', 'zip');
 	});
 
 	it('Should trigger the creation of the archive (ZIP)', async () => {
@@ -688,7 +693,7 @@ describe('archive', () => {
 
 		// Assert
 		expect(result).toBe(null);
-		expect(spyOnArchive).toBeCalledWith('/repo/path', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '/archive/file/destination.ZIP', 'zip');
+		expect(spyOnArchive).toHaveBeenCalledWith('/repo/path', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '/archive/file/destination.ZIP', 'zip');
 	});
 
 	it('Should return an error message when the specified archive destination has an invalid file extension', async () => {
@@ -1748,7 +1753,7 @@ describe('showInformationMessage', () => {
 		await showInformationMessage('Message');
 
 		// Assert
-		expect(vscode.window.showInformationMessage).toBeCalledWith('Message');
+		expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Message');
 	});
 
 	it('Should show an information message (rejects)', async () => {
@@ -1759,7 +1764,7 @@ describe('showInformationMessage', () => {
 		await showInformationMessage('Message');
 
 		// Assert
-		expect(vscode.window.showInformationMessage).toBeCalledWith('Message');
+		expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Message');
 	});
 });
 
@@ -1772,7 +1777,7 @@ describe('showErrorMessage', () => {
 		await showErrorMessage('Message');
 
 		// Assert
-		expect(vscode.window.showErrorMessage).toBeCalledWith('Message');
+		expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('Message');
 	});
 
 	it('Should show an error message (rejects)', async () => {
@@ -1783,7 +1788,7 @@ describe('showErrorMessage', () => {
 		await showErrorMessage('Message');
 
 		// Assert
-		expect(vscode.window.showErrorMessage).toBeCalledWith('Message');
+		expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('Message');
 	});
 });
 
@@ -1959,12 +1964,12 @@ describe('findGit', () => {
 	});
 
 	describe('process.platform === \'darwin\'', () => {
-		let spyOnExec: jest.SpyInstance;
+		let spyOnExec: jest.Mock;
 		beforeEach(() => {
 			jest.spyOn(extensionState, 'getLastKnownGitPath').mockReturnValueOnce(null);
 			vscode.mockExtensionSettingReturnValue('path', null);
 			Object.defineProperty(process, 'platform', { value: 'darwin' });
-			spyOnExec = jest.spyOn(cp, 'exec');
+			spyOnExec = cp.exec as unknown as jest.Mock;
 		});
 
 		it('Should find and return the Git executable using "which git"', async () => {
@@ -2344,7 +2349,7 @@ describe('getGitExecutableFromPaths', () => {
 			path: '/path/to/first/git',
 			version: '1.2.3'
 		});
-		expect(spyOnSpawn).toBeCalledTimes(1);
+		expect(spyOnSpawn).toHaveBeenCalledTimes(1);
 	});
 
 	it('Should return the git version information from the first valid path (first invalid)', async () => {
@@ -2360,7 +2365,7 @@ describe('getGitExecutableFromPaths', () => {
 			path: '/path/to/second/git',
 			version: '1.2.3'
 		});
-		expect(spyOnSpawn).toBeCalledTimes(2);
+		expect(spyOnSpawn).toHaveBeenCalledTimes(2);
 	});
 
 	it('Should reject when none of the provided paths are valid Git executables', async () => {
@@ -2374,7 +2379,7 @@ describe('getGitExecutableFromPaths', () => {
 
 		// Assert
 		expect(rejected).toBe(true);
-		expect(spyOnSpawn).toBeCalledTimes(2);
+		expect(spyOnSpawn).toHaveBeenCalledTimes(2);
 	});
 
 	it('Should reject when no paths are provided', async () => {
@@ -2386,7 +2391,7 @@ describe('getGitExecutableFromPaths', () => {
 
 		// Assert
 		expect(rejected).toBe(true);
-		expect(spyOnSpawn).toBeCalledTimes(0);
+		expect(spyOnSpawn).toHaveBeenCalledTimes(0);
 	});
 });
 

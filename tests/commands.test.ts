@@ -7,6 +7,12 @@ jest.mock('../src/extensionState');
 jest.mock('../src/gitGraphView');
 jest.mock('../src/logger');
 jest.mock('../src/repoManager');
+jest.mock('os', () => ({
+	...jest.requireActual('os'),
+	arch: jest.fn(),
+	release: jest.fn(),
+	type: jest.fn()
+}));
 
 import * as os from 'os';
 import { ConfigurationChangeEvent } from 'vscode';
@@ -535,7 +541,7 @@ describe('CommandManager', () => {
 			// Assert
 			await waitForExpect(() => {
 				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: git-graph.clearAvatarCache');
-				expect(spyOnClearCache).toBeCalledTimes(1);
+				expect(spyOnClearCache).toHaveBeenCalledTimes(1);
 				expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('The Avatar Cache was successfully cleared.');
 			});
 		});
@@ -552,7 +558,7 @@ describe('CommandManager', () => {
 			// Assert
 			await waitForExpect(() => {
 				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: git-graph.clearAvatarCache');
-				expect(spyOnClearCache).toBeCalledTimes(1);
+				expect(spyOnClearCache).toHaveBeenCalledTimes(1);
 				expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(errorMessage);
 			});
 		});
@@ -568,7 +574,7 @@ describe('CommandManager', () => {
 			// Assert
 			await waitForExpect(() => {
 				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: git-graph.clearAvatarCache');
-				expect(spyOnClearCache).toBeCalledTimes(1);
+				expect(spyOnClearCache).toHaveBeenCalledTimes(1);
 				expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('An unexpected error occurred while running the command "Clear Avatar Cache".');
 			});
 		});
@@ -816,7 +822,7 @@ describe('CommandManager', () => {
 
 			// Assert
 			expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: git-graph.endAllWorkspaceCodeReviews');
-			expect(spyOnEndAllWorkspaceCodeReviews).toBeCalledTimes(1);
+			expect(spyOnEndAllWorkspaceCodeReviews).toHaveBeenCalledTimes(1);
 			expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Ended All Code Reviews in Workspace');
 		});
 	});
@@ -1185,13 +1191,13 @@ describe('CommandManager', () => {
 	});
 
 	describe('git-graph.version', () => {
-		let spyOnCopyToClipboard: jest.SpyInstance, spyOnGetExtensionVersion: jest.SpyInstance, spyOnOsType: jest.SpyInstance, spyOnOsArch: jest.SpyInstance, spyOnOsRelease: jest.SpyInstance;
+		let spyOnCopyToClipboard: jest.SpyInstance, spyOnGetExtensionVersion: jest.SpyInstance, spyOnOsType: jest.Mock, spyOnOsArch: jest.Mock, spyOnOsRelease: jest.Mock;
 		beforeAll(() => {
 			spyOnCopyToClipboard = jest.spyOn(utils, 'copyToClipboard');
 			spyOnGetExtensionVersion = jest.spyOn(utils, 'getExtensionVersion');
-			spyOnOsType = jest.spyOn(os, 'type');
-			spyOnOsArch = jest.spyOn(os, 'arch');
-			spyOnOsRelease = jest.spyOn(os, 'release');
+			spyOnOsType = os.type as jest.Mock;
+			spyOnOsArch = os.arch as jest.Mock;
+			spyOnOsRelease = os.release as jest.Mock;
 		});
 
 		it('Should display the version information, and copy it to the clipboard', async () => {

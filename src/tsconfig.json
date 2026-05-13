@@ -4,6 +4,7 @@
 		"lib": [
 			"es6"
 		],
+		"ignoreDeprecations": "6.0",
 		"module": "commonjs",
 		"moduleResolution": "node",
 		"outDir": "../out",

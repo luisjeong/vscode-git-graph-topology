@@ -12,7 +12,7 @@ let spyOnLog: jest.SpyInstance;
 beforeAll(() => {
 	logger = new Logger();
 	spyOnLog = jest.spyOn(logger, 'log');
-	jest.useFakeTimers();
+	jest.useFakeTimers({ legacyFakeTimers: true });
 });
 
 afterAll(() => {
