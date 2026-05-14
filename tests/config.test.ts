@@ -2616,7 +2616,7 @@ describe('Config', () => {
 			expect(value).toBe(CommitOrdering.Date);
 		});
 
-		it('Should return CommitOrdering.AuthorDate when the configuration value is "author-date"', () => {
+		it('Should return CommitOrdering.Date when the configuration value is "author-date"', () => {
 			// Setup
 			vscode.mockExtensionSettingReturnValue('repository.commits.order', 'author-date');
 
@@ -2625,10 +2625,10 @@ describe('Config', () => {
 
 			// Assert
 			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.order', 'commitOrdering');
-			expect(value).toBe(CommitOrdering.AuthorDate);
+			expect(value).toBe(CommitOrdering.Date);
 		});
 
-		it('Should return CommitOrdering.Topological when the configuration value is "topo"', () => {
+		it('Should return CommitOrdering.Date when the configuration value is "topo"', () => {
 			// Setup
 			vscode.mockExtensionSettingReturnValue('repository.commits.order', 'topo');
 
@@ -2637,7 +2637,7 @@ describe('Config', () => {
 
 			// Assert
 			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.order', 'commitOrdering');
-			expect(value).toBe(CommitOrdering.Topological);
+			expect(value).toBe(CommitOrdering.Date);
 		});
 
 		it('Should return the default value (CommitOrdering.Date) when the configuration value is invalid', () => {

@@ -7,6 +7,8 @@ jest.mock('../src/logger');
 jest.mock('../src/repoManager');
 
 import * as path from 'path';
+import * as ts from 'typescript';
+import * as vm from 'vm';
 import { ConfigurationChangeEvent } from 'vscode';
 import { AvatarEvent, AvatarManager } from '../src/avatarManager';
 import { DataSource } from '../src/dataSource';
@@ -463,6 +465,59 @@ describe('GitGraphView', () => {
 				// Assert
 				expect(mockedWebviewPanel.mocks.messages).toHaveLength(0);
 			});
+		});
+	});
+
+	describe('webview state restoration', () => {
+		it('Should restore expanded commits by hash when commit order changes', () => {
+			// Setup
+			type CommitElement = { dataset: { id?: string } };
+			type RestoreExpandedCommitElements = (
+				expandedCommit: { index: number; commitHash: string; commitElem: CommitElement | null; compareWithHash: string | null; compareWithElem: CommitElement | null },
+				elems: CommitElement[],
+				getCommitId: (hash: string) => number | null
+			) => boolean;
+			const expandedCommitHelper = ts.sys.readFile(path.join(__dirname, '..', 'web', 'expandedCommit.ts'))!;
+			const transpiledExpandedCommitHelper = ts.transpileModule(expandedCommitHelper, {
+				compilerOptions: {
+					module: ts.ModuleKind.None,
+					target: ts.ScriptTarget.ES2016
+				}
+			}).outputText;
+			const context = {};
+			vm.runInNewContext(transpiledExpandedCommitHelper, context);
+			const restoreExpandedCommitElements = (context as { restoreExpandedCommitElements: RestoreExpandedCommitElements }).restoreExpandedCommitElements;
+
+			const expandedCommitHash = 'expanded-hash';
+			const initialExpandedCommit = {
+				commitHash: expandedCommitHash,
+				index: 0,
+				commitElem: null,
+				compareWithHash: null,
+				compareWithElem: null
+			};
+			const reloadedCommits = [
+				{ hash: 'newer-hash' },
+				{ hash: 'older-hash' },
+				{ hash: expandedCommitHash }
+			];
+
+			// Run
+			const commitLookup = reloadedCommits.reduce<{ [hash: string]: number }>((lookup, commit, index) => {
+				lookup[commit.hash] = index;
+				return lookup;
+			}, {});
+			const elems = reloadedCommits.map((_, index) => ({ dataset: { id: index.toString() } }));
+
+			// Assert
+			expect(restoreExpandedCommitElements(
+				initialExpandedCommit,
+				elems,
+				(hash) => typeof commitLookup[hash] === 'number' ? commitLookup[hash] : null
+			)).toBe(true);
+			expect(initialExpandedCommit.commitHash).toBe(expandedCommitHash);
+			expect(initialExpandedCommit.index).toBe(2);
+			expect(initialExpandedCommit.commitElem).toBe(elems[2]);
 		});
 	});
 

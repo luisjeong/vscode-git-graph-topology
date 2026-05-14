@@ -942,7 +942,7 @@ class Graph {
 	}
 
 	private getGitFlowLaneMinX(lane: GG.GitFlowLaneFamily, vertex: Vertex) {
-		if ((lane === GG.GitFlowLaneFamily.Feature || lane === GG.GitFlowLaneFamily.ReleaseHotfix) && this.isCompactGitFlowVertex(vertex)) {
+		if (lane === GG.GitFlowLaneFamily.Feature && this.isCompactGitFlowVertex(vertex)) {
 			return GIT_FLOW_LANE_MIN_X[GG.GitFlowLaneFamily.Develop] + 1;
 		}
 		return GIT_FLOW_LANE_MIN_X[lane];

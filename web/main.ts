@@ -622,7 +622,7 @@ class GitGraphView {
 			showRemoteBranches: getShowRemoteBranches(repoState.showRemoteBranchesV2),
 			includeCommitsMentionedByReflogs: getIncludeCommitsMentionedByReflogs(repoState.includeCommitsMentionedByReflogs),
 			onlyFollowFirstParent: getOnlyFollowFirstParent(repoState.onlyFollowFirstParent),
-			commitOrdering: getCommitOrdering(repoState.commitOrdering),
+			commitOrdering: GG.CommitOrdering.Date,
 			remotes: this.gitRemotes,
 			hideRemotes: repoState.hideRemotes,
 			stashes: this.gitStashes
@@ -895,16 +895,12 @@ class GitGraphView {
 
 		if (this.expandedCommit !== null) {
 			const expandedCommit = this.expandedCommit, elems = getCommitElems();
-			const commitElem = findCommitElemWithId(elems, this.getCommitId(expandedCommit.commitHash));
-			const compareWithElem = expandedCommit.compareWithHash !== null ? findCommitElemWithId(elems, this.getCommitId(expandedCommit.compareWithHash)) : null;
 
-			if (commitElem === null || (expandedCommit.compareWithHash !== null && compareWithElem === null)) {
+			if (!restoreExpandedCommitElements(expandedCommit, elems, (hash) => this.getCommitId(hash))) {
 				this.closeCommitDetails(false);
 				this.saveState();
 			} else {
-				expandedCommit.index = parseInt(commitElem.dataset.id!);
-				expandedCommit.commitElem = commitElem;
-				expandedCommit.compareWithElem = compareWithElem;
+				const commitElem = expandedCommit.commitElem!, compareWithElem = expandedCommit.compareWithElem;
 				this.saveState();
 				if (expandedCommit.compareWithHash === null) {
 					// Commit Details View is open
@@ -1823,12 +1819,6 @@ class GitGraphView {
 				this.render();
 			};
 
-			const commitOrdering = getCommitOrdering(this.gitRepos[this.currentRepo].commitOrdering);
-			const changeCommitOrdering = (repoCommitOrdering: GG.RepoCommitOrdering) => {
-				this.saveRepoStateValue(this.currentRepo, 'commitOrdering', repoCommitOrdering);
-				this.refresh(true);
-			};
-
 			contextMenu.show([
 				[
 					{
@@ -1848,26 +1838,6 @@ class GitGraphView {
 						visible: true,
 						checked: columnWidths[4] !== COLUMN_HIDDEN,
 						onClick: () => toggleColumnState(4, 80)
-					}
-				],
-				[
-					{
-						title: 'Commit Timestamp Order',
-						visible: true,
-						checked: commitOrdering === GG.CommitOrdering.Date,
-						onClick: () => changeCommitOrdering(GG.RepoCommitOrdering.Date)
-					},
-					{
-						title: 'Author Timestamp Order',
-						visible: true,
-						checked: commitOrdering === GG.CommitOrdering.AuthorDate,
-						onClick: () => changeCommitOrdering(GG.RepoCommitOrdering.AuthorDate)
-					},
-					{
-						title: 'Topological Order',
-						visible: true,
-						checked: commitOrdering === GG.CommitOrdering.Topological,
-						onClick: () => changeCommitOrdering(GG.RepoCommitOrdering.Topological)
 					}
 				]
 			], true, null, e, this.viewElem);
@@ -3752,21 +3722,6 @@ function getChildByPathSegment(folder: FileTreeFolder, pathSeg: string) {
 }
 
 
-/* Repository State Helpers */
-
-function getCommitOrdering(repoValue: GG.RepoCommitOrdering): GG.CommitOrdering {
-	switch (repoValue) {
-		case GG.RepoCommitOrdering.Default:
-			return initialState.config.commitOrdering;
-		case GG.RepoCommitOrdering.Date:
-			return GG.CommitOrdering.Date;
-		case GG.RepoCommitOrdering.AuthorDate:
-			return GG.CommitOrdering.AuthorDate;
-		case GG.RepoCommitOrdering.Topological:
-			return GG.CommitOrdering.Topological;
-	}
-}
-
 function getShowRemoteBranches(repoValue: GG.BooleanOverride) {
 	return repoValue === GG.BooleanOverride.Default
 		? initialState.config.showRemoteBranches
@@ -3944,15 +3899,6 @@ function getBranchLabels(heads: ReadonlyArray<string>, remotes: ReadonlyArray<GG
 		remoteLabels = remotes;
 	}
 	return { heads: headLabels, remotes: remoteLabels };
-}
-
-function findCommitElemWithId(elems: HTMLCollectionOf<HTMLElement>, id: number | null) {
-	if (id === null) return null;
-	let findIdStr = id.toString();
-	for (let i = 0; i < elems.length; i++) {
-		if (findIdStr === elems[i].dataset.id) return elems[i];
-	}
-	return null;
 }
 
 function generateSignatureHtml(signature: GG.GitSignature) {

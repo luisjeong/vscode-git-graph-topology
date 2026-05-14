@@ -4,6 +4,7 @@ import { decode, encodingExists } from 'iconv-lite';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
+import { orderCommitsTemporallyTopological } from './commitOrdering';
 import { getConfig } from './config';
 import { computeGitFlowLayout } from './gitFlowLayout';
 import { Logger } from './logger';
@@ -164,13 +165,15 @@ export class DataSource extends Disposable {
 	 */
 	public getCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
 		const config = getConfig();
+		void commitOrdering;
 		return Promise.all([
-			this.getLog(repo, branches, maxCommits + 1, showTags && config.showCommitsOnlyReferencedByTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes),
+			this.getLog(repo, branches, maxCommits + 1, showTags && config.showCommitsOnlyReferencedByTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, remotes, hideRemotes, stashes),
 			this.getRefs(repo, showRemoteBranches, config.showRemoteHeads, hideRemotes).then((refData: GitRefData) => refData, (errorMessage: string) => errorMessage)
 		]).then(async (results) => {
 			let commits: GitCommitRecord[] = results[0], refData: GitRefData | string = results[1], i;
 			let moreCommitsAvailable = commits.length === maxCommits + 1;
 			if (moreCommitsAvailable) commits.pop();
+			commits = orderCommitsTemporallyTopological(commits);
 
 			// It doesn't matter if getRefs() was rejected if no commits exist
 			if (typeof refData === 'string') {
@@ -262,7 +265,7 @@ export class DataSource extends Disposable {
 			}
 
 			const gitFlowLayout = config.graph.layout === GraphLayoutMode.GitFlow
-				? computeGitFlowLayout(commitNodes, refData.head)
+				? computeGitFlowLayout(commitNodes.filter((commit) => commit.hash !== UNCOMMITTED), refData.head)
 				: null;
 
 			return {
@@ -1496,14 +1499,13 @@ export class DataSource extends Disposable {
 	 * @param includeRemotes Include remote branches.
 	 * @param includeCommitsMentionedByReflogs Include commits mentioned by reflogs.
 	 * @param onlyFollowFirstParent Only follow the first parent of commits.
-	 * @param order The order for commits to be returned.
 	 * @param remotes An array of the known remotes.
 	 * @param hideRemotes An array of hidden remotes.
 	 * @param stashes An array of all stashes in the repository.
 	 * @returns An array of commits.
 	 */
-	private getLog(repo: string, branches: ReadonlyArray<string> | null, num: number, includeTags: boolean, includeRemotes: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, order: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>) {
-		const args = ['-c', 'log.showSignature=false', 'log', '--max-count=' + num, '--format=' + this.gitFormatLog, '--' + order + '-order'];
+	private getLog(repo: string, branches: ReadonlyArray<string> | null, num: number, includeTags: boolean, includeRemotes: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>) {
+		const args = ['-c', 'log.showSignature=false', 'log', '--max-count=' + num, '--format=' + this.gitFormatLog, '--date-order'];
 		if (onlyFollowFirstParent) {
 			args.push('--first-parent');
 		}

@@ -397,12 +397,8 @@ class Config {
 	 * Get the value of the `git-graph.repository.commits.order` Extension Setting.
 	 */
 	get commitOrder() {
-		const ordering = this.getRenamedExtensionSetting<string>('repository.commits.order', 'commitOrdering', 'date');
-		return ordering === 'author-date'
-			? CommitOrdering.AuthorDate
-			: ordering === 'topo'
-				? CommitOrdering.Topological
-				: CommitOrdering.Date;
+		this.getRenamedExtensionSetting<string>('repository.commits.order', 'commitOrdering', 'date');
+		return CommitOrdering.Date;
 	}
 
 	/**

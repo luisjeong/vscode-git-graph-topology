@@ -1022,21 +1022,6 @@
 					"default": true,
 					"description": "Display merge commits with a muted text color."
 				},
-				"git-graph.repository.commits.order": {
-					"type": "string",
-					"enum": [
-						"date",
-						"author-date",
-						"topo"
-					],
-					"enumDescriptions": [
-						"Show commits in the commit timestamp order.",
-						"Show commits in the author timestamp order.",
-						"Avoid showing commits on multiple lines of history intermixed."
-					],
-					"default": "date",
-					"markdownDescription": "Specifies the order of commits on the Git Graph View. See [git log](https://git-scm.com/docs/git-log#_commit_ordering) for more information on each order option. This can be overridden per repository via the Git Graph View's Column Header Context Menu."
-				},
 				"git-graph.repository.commits.showSignatureStatus": {
 					"type": "boolean",
 					"default": false,
@@ -1217,23 +1202,6 @@
 					"description": "Specifies where the Commit Details View is rendered in the Git Graph view.",
 					"deprecationMessage": "Depreciated: This setting has been renamed to git-graph.commitDetailsView.location",
 					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#git-graph.commitDetailsView.location#`"
-				},
-				"git-graph.commitOrdering": {
-					"type": "string",
-					"enum": [
-						"date",
-						"author-date",
-						"topo"
-					],
-					"enumDescriptions": [
-						"Show commits in the commit timestamp order.",
-						"Show commits in the author timestamp order.",
-						"Avoid showing commits on multiple lines of history intermixed."
-					],
-					"default": "date",
-					"markdownDescription": "Specifies the order of commits on the Git Graph view. See [git log](https://git-scm.com/docs/git-log#_commit_ordering) for more information on each order option.",
-					"deprecationMessage": "Depreciated: This setting has been renamed to git-graph.repository.commits.order",
-					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#git-graph.repository.commits.order#`"
 				},
 				"git-graph.dateFormat": {
 					"type": "string",

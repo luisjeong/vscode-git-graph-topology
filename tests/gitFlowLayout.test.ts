@@ -152,7 +152,7 @@ describe('computeGitFlowLayout', () => {
 		expect(layout.byHash.get('r1')).toBe(GitFlowLaneFamily.ReleaseHotfix);
 	});
 
-	it('uses hotfix merge messages merged only into develop as release-hotfix side paths', () => {
+	it('uses hotfix merge messages merged only into develop as non-compact release-hotfix side paths', () => {
 		const commits = [
 			commit('m2', ['m1'], { heads: ['main'] }),
 			commit('d3', ['d2', 'h2'], { heads: ['develop'], message: 'Merge branch \'hotfix/fe-router-fix\' into develop' }),
@@ -168,8 +168,28 @@ describe('computeGitFlowLayout', () => {
 		expect(layout.byHash.get('d3')).toBe(GitFlowLaneFamily.Develop);
 		expect(layout.byHash.get('h2')).toBe(GitFlowLaneFamily.ReleaseHotfix);
 		expect(layout.byHash.get('h1')).toBe(GitFlowLaneFamily.ReleaseHotfix);
-		expect(layout.commits.find((entry) => entry.hash === 'h2')!.compact).toBe(true);
-		expect(layout.commits.find((entry) => entry.hash === 'h1')!.compact).toBe(true);
+		expect(layout.commits.find((entry) => entry.hash === 'h2')!.compact).toBeUndefined();
+		expect(layout.commits.find((entry) => entry.hash === 'h1')!.compact).toBeUndefined();
+	});
+
+	it('keeps fix merge messages merged only into develop as compact feature side paths', () => {
+		const commits = [
+			commit('m2', ['m1'], { heads: ['main'] }),
+			commit('d3', ['d2', 'x2'], { heads: ['develop'], message: 'Merge branch \'fix/S14P11B107-84_branchClear\' into develop' }),
+			commit('x2', ['x1']),
+			commit('x1', ['d1']),
+			commit('d2', ['d1']),
+			commit('d1', ['m1']),
+			commit('m1', [])
+		];
+
+		const layout = lanes(commits);
+
+		expect(layout.byHash.get('d3')).toBe(GitFlowLaneFamily.Develop);
+		expect(layout.byHash.get('x2')).toBe(GitFlowLaneFamily.Feature);
+		expect(layout.byHash.get('x1')).toBe(GitFlowLaneFamily.Feature);
+		expect(layout.commits.find((entry) => entry.hash === 'x2')!.compact).toBe(true);
+		expect(layout.commits.find((entry) => entry.hash === 'x1')!.compact).toBe(true);
 	});
 
 	it('marks short feature side paths merged into develop as compact', () => {
