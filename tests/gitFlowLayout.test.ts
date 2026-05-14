@@ -278,6 +278,29 @@ describe('computeGitFlowLayout', () => {
 		expect(layout.byHash.get('f1')).toBe(GitFlowLaneFamily.Feature);
 	});
 
+	it('keeps develop side paths from pull merges on the develop lane', () => {
+		const commits = [
+			commit('m2', ['m1'], { heads: ['main'] }),
+			commit('d4', ['d2', 'rd2'], { heads: ['develop'], message: 'Merge branch \'develop\' of https://lab.example.com/group/repo into develop' }),
+			commit('rd2', ['rd1']),
+			commit('rd1', ['d1']),
+			commit('d2', ['d1']),
+			commit('d1', ['m1']),
+			commit('m1', [])
+		];
+
+		const layout = computeGitFlowLayout(commits, null);
+		const byHash = new Map(layout.commits.map((entry) => [entry.hash, entry]));
+
+		expect(byHash.get('d4')!.lane).toBe(GitFlowLaneFamily.Develop);
+		expect(byHash.get('rd2')!.lane).toBe(GitFlowLaneFamily.Develop);
+		expect(byHash.get('rd1')!.lane).toBe(GitFlowLaneFamily.Develop);
+		expect(byHash.get('rd2')!.branch).toBe('develop');
+		expect(byHash.get('rd1')!.branch).toBe('develop');
+		expect(byHash.get('rd2')!.compact).toBeUndefined();
+		expect(byHash.get('rd1')!.compact).toBeUndefined();
+	});
+
 	it('falls back to HEAD when no main branch ref is visible', () => {
 		const commits = [
 			commit('h2', ['h1']),

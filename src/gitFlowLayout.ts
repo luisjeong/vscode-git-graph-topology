@@ -34,15 +34,16 @@ export function computeGitFlowLayout(commits: ReadonlyArray<GitCommit>, head: st
 	traceReleaseHotfixRefs(commits, commitByHash, lanes);
 
 	const sidePaths = collectSidePaths(commits, commitByHash, commitIndexByHash, lanes);
+	const longLivedSidePathLanes = findLongLivedSidePathLanes(sidePaths);
 	const releaseHotfixCommits = findReleaseHotfixSidePathCommits(sidePaths);
-	const compactCommits = findCompactSidePathCommits(sidePaths, releaseHotfixCommits);
+	const compactCommits = findCompactSidePathCommits(sidePaths, releaseHotfixCommits, longLivedSidePathLanes);
 	const branchByHash = new Map<string, string>();
 
 	sidePaths.forEach((path) => {
 		path.commits.forEach((hash) => {
 			if (!lanes.has(hash)) {
 				const commit = commitByHash.get(hash);
-				lanes.set(hash, releaseHotfixCommits.has(hash) && (!commit || !isPseudoCommit(commit) || hasReleaseHotfixRef(commit)) ? GitFlowLaneFamily.ReleaseHotfix : GitFlowLaneFamily.Feature);
+				lanes.set(hash, longLivedSidePathLanes.get(hash) || (releaseHotfixCommits.has(hash) && (!commit || !isPseudoCommit(commit) || hasReleaseHotfixRef(commit)) ? GitFlowLaneFamily.ReleaseHotfix : GitFlowLaneFamily.Feature));
 			}
 			if (path.branch !== null && !branchByHash.has(hash)) {
 				branchByHash.set(hash, path.branch);
@@ -195,12 +196,29 @@ function findReleaseHotfixSidePathCommits(sidePaths: ReadonlyArray<SidePath>) {
 	return releaseHotfixCommits;
 }
 
-function findCompactSidePathCommits(sidePaths: ReadonlyArray<SidePath>, releaseHotfixCommits: ReadonlySet<string>) {
+function findLongLivedSidePathLanes(sidePaths: ReadonlyArray<SidePath>) {
+	const lanes = new Map<string, GitFlowLaneFamily>();
+	sidePaths.forEach((path) => {
+		const lane = getLongLivedSidePathLane(path);
+		if (typeof lane !== 'string') return;
+		path.commits.forEach((hash) => lanes.set(hash, lane));
+	});
+	return lanes;
+}
+
+function getLongLivedSidePathLane(path: SidePath) {
+	if (path.branch === null) return undefined;
+	if (path.mergeLane === GitFlowLaneFamily.Develop && DEVELOP_BRANCHES.indexOf(path.branch) >= 0) return GitFlowLaneFamily.Develop;
+	if (path.mergeLane === GitFlowLaneFamily.Main && MAIN_BRANCHES.indexOf(path.branch) >= 0) return GitFlowLaneFamily.Main;
+	return undefined;
+}
+
+function findCompactSidePathCommits(sidePaths: ReadonlyArray<SidePath>, releaseHotfixCommits: ReadonlySet<string>, longLivedSidePathLanes: ReadonlyMap<string, GitFlowLaneFamily>) {
 	const compactCommits = new Set<string>();
 	sidePaths.forEach((path) => {
 		if (path.compact) {
 			path.commits.forEach((hash) => {
-				if (!releaseHotfixCommits.has(hash)) compactCommits.add(hash);
+				if (!releaseHotfixCommits.has(hash) && !longLivedSidePathLanes.has(hash)) compactCommits.add(hash);
 			});
 		}
 	});

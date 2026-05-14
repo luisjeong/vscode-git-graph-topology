@@ -184,6 +184,7 @@ class Vertex {
 	private x: number = 0;
 	private children: Vertex[] = [];
 	private parents: Vertex[] = [];
+	private parentProcessingOrder: number[] | null = null;
 	private nextParent: number = 0;
 	private onBranch: Branch | null = null;
 	private isCommitted: boolean = true;
@@ -219,18 +220,24 @@ class Vertex {
 		return this.parents;
 	}
 
+	public setParentProcessingOrder(parentProcessingOrder: number[]) {
+		this.parentProcessingOrder = parentProcessingOrder;
+	}
+
 	public hasParents() {
 		return this.parents.length > 0;
 	}
 
 	public getNextParent(): Vertex | null {
-		if (this.nextParent < this.parents.length) return this.parents[this.nextParent];
+		const parentIndex = this.parentProcessingOrder !== null ? this.parentProcessingOrder[this.nextParent] : this.nextParent;
+		if (typeof parentIndex === 'number' && parentIndex < this.parents.length) return this.parents[parentIndex];
 		return null;
 	}
 
 	public getLastParent(): Vertex | null {
 		if (this.nextParent < 1) return null;
-		return this.parents[this.nextParent - 1];
+		const parentIndex = this.parentProcessingOrder !== null ? this.parentProcessingOrder[this.nextParent - 1] : this.nextParent - 1;
+		return typeof parentIndex === 'number' ? this.parents[parentIndex] : null;
 	}
 
 	public registerParentProcessed() {
@@ -467,17 +474,22 @@ class Graph {
 			this.vertices.push(new Vertex(i, commits[i].stash !== null));
 		}
 		for (i = 0; i < commits.length; i++) {
+			const parentIndexByOriginalIndex: { [index: number]: number } = {};
+			let graphParentIndex = 0;
 			for (j = 0; j < commits[i].parents.length; j++) {
 				let parentHash = commits[i].parents[j];
 				if (typeof commitLookup[parentHash] === 'number') {
 					// Parent is the <commitLookup[parentHash]>th vertex
+					parentIndexByOriginalIndex[j] = graphParentIndex++;
 					this.vertices[i].addParent(this.vertices[commitLookup[parentHash]]);
 					this.vertices[commitLookup[parentHash]].addChild(this.vertices[i]);
 				} else if (!this.onlyFollowFirstParent || j === 0) {
 					// Parent is not one of the vertices of the graph, and the parent isn't being hidden by the onlyFollowFirstParent condition.
+					parentIndexByOriginalIndex[j] = graphParentIndex++;
 					this.vertices[i].addParent(nullVertex);
 				}
 			}
+			this.vertices[i].setParentProcessingOrder(this.getCommitParentProcessingOrder(commits[i], parentIndexByOriginalIndex));
 		}
 
 		if (commits[0].hash === UNCOMMITTED) {
@@ -491,6 +503,29 @@ class Graph {
 		}
 
 		this.determinePaths();
+	}
+
+	private getCommitParentProcessingOrder(commit: GG.GitCommit, parentIndexByOriginalIndex: { [index: number]: number }): number[] {
+		const parentIndexes = commit.parents
+			.map((_hash, originalIndex) => parentIndexByOriginalIndex[originalIndex])
+			.filter((parentIndex) => typeof parentIndex === 'number');
+		if (this.gitFlowLaneByHash === null || this.gitFlowBranchByHash === null || parentIndexes.length < 2) return parentIndexes;
+
+		const lane = this.gitFlowLaneByHash[commit.hash];
+		const longLivedBranches = lane === GG.GitFlowLaneFamily.Develop
+			? ['develop', 'dev']
+			: lane === GG.GitFlowLaneFamily.Main
+				? ['main', 'master', 'trunk']
+				: [];
+		if (longLivedBranches.length === 0) return parentIndexes;
+
+		const preferredParentIndex = commit.parents.findIndex((parentHash) =>
+			this.gitFlowLaneByHash![parentHash] === lane && longLivedBranches.indexOf(this.gitFlowBranchByHash![parentHash]) > -1
+		);
+		if (preferredParentIndex < 1 || typeof parentIndexByOriginalIndex[preferredParentIndex] !== 'number') return parentIndexes;
+
+		return [parentIndexByOriginalIndex[preferredParentIndex]]
+			.concat(parentIndexes.filter((parentIndex) => parentIndex !== parentIndexByOriginalIndex[preferredParentIndex]));
 	}
 
 	public render(expandedCommit: ExpandedCommit | null) {
