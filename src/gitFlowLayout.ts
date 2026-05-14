@@ -35,7 +35,7 @@ export function computeGitFlowLayout(commits: ReadonlyArray<GitCommit>, head: st
 
 	const sidePaths = collectSidePaths(commits, commitByHash, commitIndexByHash, lanes);
 	const releaseHotfixCommits = findReleaseHotfixSidePathCommits(sidePaths);
-	const compactCommits = findCompactSidePathCommits(sidePaths);
+	const compactCommits = findCompactSidePathCommits(sidePaths, releaseHotfixCommits);
 	const branchByHash = new Map<string, string>();
 
 	sidePaths.forEach((path) => {
@@ -195,11 +195,13 @@ function findReleaseHotfixSidePathCommits(sidePaths: ReadonlyArray<SidePath>) {
 	return releaseHotfixCommits;
 }
 
-function findCompactSidePathCommits(sidePaths: ReadonlyArray<SidePath>) {
+function findCompactSidePathCommits(sidePaths: ReadonlyArray<SidePath>, releaseHotfixCommits: ReadonlySet<string>) {
 	const compactCommits = new Set<string>();
 	sidePaths.forEach((path) => {
 		if (path.compact) {
-			path.commits.forEach((hash) => compactCommits.add(hash));
+			path.commits.forEach((hash) => {
+				if (!releaseHotfixCommits.has(hash)) compactCommits.add(hash);
+			});
 		}
 	});
 	return compactCommits;

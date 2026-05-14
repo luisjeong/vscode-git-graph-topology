@@ -152,7 +152,7 @@ describe('computeGitFlowLayout', () => {
 		expect(layout.byHash.get('r1')).toBe(GitFlowLaneFamily.ReleaseHotfix);
 	});
 
-	it('uses hotfix merge messages merged only into develop as release-hotfix side paths', () => {
+	it('uses hotfix merge messages merged only into develop as non-compact release-hotfix side paths', () => {
 		const commits = [
 			commit('m2', ['m1'], { heads: ['main'] }),
 			commit('d3', ['d2', 'h2'], { heads: ['develop'], message: 'Merge branch \'hotfix/fe-router-fix\' into develop' }),
@@ -168,8 +168,8 @@ describe('computeGitFlowLayout', () => {
 		expect(layout.byHash.get('d3')).toBe(GitFlowLaneFamily.Develop);
 		expect(layout.byHash.get('h2')).toBe(GitFlowLaneFamily.ReleaseHotfix);
 		expect(layout.byHash.get('h1')).toBe(GitFlowLaneFamily.ReleaseHotfix);
-		expect(layout.commits.find((entry) => entry.hash === 'h2')!.compact).toBe(true);
-		expect(layout.commits.find((entry) => entry.hash === 'h1')!.compact).toBe(true);
+		expect(layout.commits.find((entry) => entry.hash === 'h2')!.compact).toBeUndefined();
+		expect(layout.commits.find((entry) => entry.hash === 'h1')!.compact).toBeUndefined();
 	});
 
 	it('marks short feature side paths merged into develop as compact', () => {
