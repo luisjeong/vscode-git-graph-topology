@@ -172,6 +172,26 @@ describe('computeGitFlowLayout', () => {
 		expect(layout.commits.find((entry) => entry.hash === 'h1')!.compact).toBeUndefined();
 	});
 
+	it('uses fix merge messages merged into develop as non-compact release-hotfix side paths', () => {
+		const commits = [
+			commit('m2', ['m1'], { heads: ['main'] }),
+			commit('d3', ['d2', 'x2'], { heads: ['develop'], message: 'Merge branch \'fix/S14P11B107-84_branchClear\' into develop' }),
+			commit('x2', ['x1']),
+			commit('x1', ['d1']),
+			commit('d2', ['d1']),
+			commit('d1', ['m1']),
+			commit('m1', [])
+		];
+
+		const layout = lanes(commits);
+
+		expect(layout.byHash.get('d3')).toBe(GitFlowLaneFamily.Develop);
+		expect(layout.byHash.get('x2')).toBe(GitFlowLaneFamily.ReleaseHotfix);
+		expect(layout.byHash.get('x1')).toBe(GitFlowLaneFamily.ReleaseHotfix);
+		expect(layout.commits.find((entry) => entry.hash === 'x2')!.compact).toBeUndefined();
+		expect(layout.commits.find((entry) => entry.hash === 'x1')!.compact).toBeUndefined();
+	});
+
 	it('marks short feature side paths merged into develop as compact', () => {
 		const commits = [
 			commit('m2', ['m1'], { heads: ['main'] }),
@@ -198,10 +218,10 @@ describe('computeGitFlowLayout', () => {
 	it('preserves merge-message branch identity for repeated feature merges', () => {
 		const commits = [
 			commit('m2', ['m1'], { heads: ['main'] }),
-			commit('d5', ['d4', 'f4'], { heads: ['develop'], message: 'Merge branch \'fix/fe-scenarioselect-breakpoints\' into develop' }),
+			commit('d5', ['d4', 'f4'], { heads: ['develop'], message: 'Merge branch \'feature/fe-scenarioselect-breakpoints\' into develop' }),
 			commit('f4', ['f3']),
 			commit('f3', ['d3']),
-			commit('d4', ['d3', 'f2'], { message: 'Merge branch \'fix/fe-scenarioselect-breakpoints\' into develop' }),
+			commit('d4', ['d3', 'f2'], { message: 'Merge branch \'feature/fe-scenarioselect-breakpoints\' into develop' }),
 			commit('f2', ['f1']),
 			commit('f1', ['d2']),
 			commit('d3', ['d2']),
@@ -213,8 +233,8 @@ describe('computeGitFlowLayout', () => {
 		const layout = computeGitFlowLayout(commits, null);
 		const byHash = new Map(layout.commits.map((entry) => [entry.hash, entry]));
 
-		expect(byHash.get('f4')!.branch).toBe('fix/fe-scenarioselect-breakpoints');
-		expect(byHash.get('f2')!.branch).toBe('fix/fe-scenarioselect-breakpoints');
+		expect(byHash.get('f4')!.branch).toBe('feature/fe-scenarioselect-breakpoints');
+		expect(byHash.get('f2')!.branch).toBe('feature/fe-scenarioselect-breakpoints');
 		expect(byHash.get('f4')!.lane).toBe(GitFlowLaneFamily.Feature);
 		expect(byHash.get('f2')!.lane).toBe(GitFlowLaneFamily.Feature);
 	});
@@ -222,10 +242,10 @@ describe('computeGitFlowLayout', () => {
 	it('normalises remote branch identity for repeated feature merges', () => {
 		const commits = [
 			commit('m2', ['m1'], { heads: ['main'] }),
-			commit('d5', ['d4', 'f4'], { heads: ['develop'], message: 'Merge branch \'fix/fe-scenarioselect-breakpoints\' into develop' }),
-			commit('f4', ['f3'], { remotes: [remote('origin/fix/fe-scenarioselect-breakpoints')] }),
+			commit('d5', ['d4', 'f4'], { heads: ['develop'], message: 'Merge branch \'feature/fe-scenarioselect-breakpoints\' into develop' }),
+			commit('f4', ['f3'], { remotes: [remote('origin/feature/fe-scenarioselect-breakpoints')] }),
 			commit('f3', ['d3']),
-			commit('d4', ['d3', 'f2'], { message: 'Merge remote-tracking branch \'origin/fix/fe-scenarioselect-breakpoints\' into develop' }),
+			commit('d4', ['d3', 'f2'], { message: 'Merge remote-tracking branch \'origin/feature/fe-scenarioselect-breakpoints\' into develop' }),
 			commit('f2', ['f1']),
 			commit('f1', ['d2']),
 			commit('d3', ['d2']),
@@ -237,8 +257,8 @@ describe('computeGitFlowLayout', () => {
 		const layout = computeGitFlowLayout(commits, null);
 		const byHash = new Map(layout.commits.map((entry) => [entry.hash, entry]));
 
-		expect(byHash.get('f4')!.branch).toBe('fix/fe-scenarioselect-breakpoints');
-		expect(byHash.get('f2')!.branch).toBe('fix/fe-scenarioselect-breakpoints');
+		expect(byHash.get('f4')!.branch).toBe('feature/fe-scenarioselect-breakpoints');
+		expect(byHash.get('f2')!.branch).toBe('feature/fe-scenarioselect-breakpoints');
 	});
 
 	it('keeps branches merged only into develop as feature', () => {
