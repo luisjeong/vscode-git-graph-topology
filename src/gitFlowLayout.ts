@@ -2,7 +2,7 @@ import { GitCommit, GitCommitRemote, GitFlowLaneFamily, GitFlowLayoutData } from
 
 const MAIN_BRANCHES = ['main', 'master', 'trunk'];
 const DEVELOP_BRANCHES = ['develop', 'dev'];
-const RELEASE_HOTFIX_BRANCH = /(?:^|[^\w.-])(?:release|hotfix|fix)[/-][\w./-]+/i;
+const RELEASE_HOTFIX_BRANCH = /(?:^|[^\w.-])(?:release|hotfix)[/-][\w./-]+/i;
 const MERGE_BRANCH = /Merge (?:remote-tracking )?branch ['"]([^'"]+)['"]/i;
 const COMPACT_FEATURE_MAX_COMMITS = 12;
 const COMPACT_FEATURE_MAX_EXTRA_ROWS = 3;
@@ -266,7 +266,7 @@ function isLongLivedBranch(branchName: string) {
 }
 
 function isReleaseHotfixBranch(branchName: string) {
-	return branchName.indexOf('release/') === 0 || branchName.indexOf('release-') === 0 || branchName.indexOf('hotfix/') === 0 || branchName.indexOf('hotfix-') === 0 || branchName.indexOf('fix/') === 0 || branchName.indexOf('fix-') === 0;
+	return branchName.indexOf('release/') === 0 || branchName.indexOf('release-') === 0 || branchName.indexOf('hotfix/') === 0 || branchName.indexOf('hotfix-') === 0;
 }
 
 function isPseudoCommit(commit: GitCommit) {
